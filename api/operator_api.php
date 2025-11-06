@@ -37,6 +37,17 @@ function fetchCheckInStatusColumn(mysqli $conn): ?array
 function checkInStatusAllowsValue(array $column, string $value): bool
 {
     $type = strtolower($column['Type'] ?? '');
+    if ($type === '' ) {
+        return false;
+    }
+
+    if (preg_match('/^(?:tiny|small|medium|big)?int/', $type) ||
+        preg_match('/^(?:decimal|double|float)/', $type) ||
+        preg_match('/^(?:bit|bool|boolean)/', $type)
+    ) {
+        return false; // Tipos numéricos nunca podrán almacenar la cadena "Discrepancia"
+    }
+
     if (substr($type, 0, 5) === 'enum(') {
         if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
             return false;

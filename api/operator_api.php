@@ -62,6 +62,30 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         return;
     }
 
+    if (substr($type, 0, 4) === 'set(') {
+        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
+            return;
+        }
+
+        $values = $matches[1] ?? [];
+        if (in_array('Discrepancia', $values, true)) {
+            return; // Ya permite el valor requerido
+        }
+
+        $values[] = 'Discrepancia';
+        $escapedValues = array_map(
+            fn(string $value): string => "'" . $conn->real_escape_string(stripslashes($value)) . "'",
+            $values
+        );
+
+        $setSql = implode(',', $escapedValues);
+        $sql = "ALTER TABLE check_ins MODIFY status SET($setSql)$nullClause$defaultClause";
+        if (!$conn->query($sql)) {
+            error_log('No se pudo actualizar la columna check_ins.status de tipo SET: ' . $conn->error);
+        }
+        return;
+    }
+
     if (preg_match('/^varchar\((\d+)\)/', $type, $lengthMatch)) {
         $currentLength = (int)($lengthMatch[1] ?? 0);
         $requiredLength = max(12, $currentLength);

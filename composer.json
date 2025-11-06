@@ -1,0 +1,12 @@
+{
+  "require": {
+    "php": "^8.0",
+    "ext-pdo_pgsql": "*",
+    "phpmailer/phpmailer": "^6.8"
+  },
+  "config": {
+    "platform": {
+      "php": "8.0"
+    }
+  }
+}

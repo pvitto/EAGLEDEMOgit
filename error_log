@@ -1,0 +1,90 @@
+[01-Nov-2025 09:11:19 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:23 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:24 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:54 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:55 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:58 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:11:58 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:00 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:01 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:02 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:08 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:11 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:12:22 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:14:44 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:14:47 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:15:57 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:130
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(130): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 130
+[01-Nov-2025 09:20:46 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:137
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(137): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 137
+[01-Nov-2025 09:23:57 America/Bogota] PHP Fatal error:  Uncaught mysqli_sql_exception: Expression #1 of SELECT list is not in GROUP BY clause and contains nonaggregated column 'imancini9_eagle_3_db.t.id' which is not functionally dependent on columns in GROUP BY clause; this is incompatible with sql_mode=only_full_group_by in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php:137
+Stack trace:
+#0 /home/imancini9/public_html/eagle/EAGLEDEMO/index.php(137): mysqli->query()
+#1 {main}
+  thrown in /home/imancini9/public_html/eagle/EAGLEDEMO/index.php on line 137

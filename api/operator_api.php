@@ -79,22 +79,40 @@ if ($method === 'POST') {
             $alert_id = $stmt_alert->insert_id;
             $stmt_alert->close();
 
-            // Asignar UNA tarea al GRUPO 'Digitador'
+            // Asignar UNA tarea a un usuario 'Digitador'
             if ($alert_id) {
-                $instruction = "Realizar seguimiento a la discrepancia (" . $invoice_number . "), contactar a los responsables y documentar la resolución.";
+                // Primero, buscar un usuario 'Digitador' a quien asignar la tarea
+                $res_digitador = $conn->query("SELECT id FROM users WHERE role = 'Digitador' AND status = 'Activo' LIMIT 1");
+                $assignee_id = null;
+                if ($res_digitador->num_rows > 0) {
+                    $assignee_id = $res_digitador->fetch_assoc()['id'];
+                } else {
+                    // Fallback: si no hay Digitador, buscar un Admin
+                    $res_admin = $conn->query("SELECT id FROM users WHERE role = 'Admin' AND status = 'Activo' LIMIT 1");
+                    if ($res_admin->num_rows > 0) {
+                        $assignee_id = $res_admin->fetch_assoc()['id'];
+                    }
+                }
 
-                // Preparamos la inserción de la tarea asignada al grupo
-                $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'Pendiente', 'Alta', ?)");
+                if ($assignee_id) {
+                    $instruction = "Realizar seguimiento a la discrepancia (" . $invoice_number . "), contactar a los responsables y documentar la resolución.";
 
-                // El created_by_user_id es el Operador que generó la discrepancia
-                $operator_user_id = $_SESSION['user_id'];
+                    // Preparamos la inserción de la tarea, ahora asignada a un usuario específico
+                    $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_user_id, instruction, type, status, priority, created_by_user_id) VALUES (?, ?, ?, 'Asignacion', 'Pendiente', 'Alta', ?)");
 
-                $stmt_task->bind_param("isi", $alert_id, $instruction, $operator_user_id);
-                $stmt_task->execute();
-                $stmt_task->close();
+                    $operator_user_id = $_SESSION['user_id'];
 
-                // Actualizamos el estado de la alerta
-                $conn->query("UPDATE alerts SET status = 'Asignada' WHERE id = $alert_id");
+                    $stmt_task->bind_param("iisi", $alert_id, $assignee_id, $instruction, $operator_user_id);
+                    $stmt_task->execute();
+                    $stmt_task->close();
+
+                    // Actualizamos el estado de la alerta
+                    $conn->query("UPDATE alerts SET status = 'Asignada' WHERE id = $alert_id");
+                } else {
+                    // Si no se encuentra a quién asignar, se podría registrar un error o manejarlo de otra forma.
+                    // Por ahora, no creamos la tarea si no hay a quién asignarla.
+                    error_log("No se pudo crear la tarea para la alerta $alert_id: no se encontró un usuario 'Digitador' o 'Admin' activo a quien asignarla.");
+                }
             }
 // --- FIN DEL NUEVO CÓDIGO ---
         }

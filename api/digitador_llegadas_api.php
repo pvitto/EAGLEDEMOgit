@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['Digitado
     exit;
 }
 
-// Muestra todos los check-ins que ya pasaron por el operador (Procesado o con Discrepancia)
+// Muestra todos los check-ins que ya pasaron por el operador (Procesado o con Faltante)
 // y que aún no han sido cerrados por el digitador.
 $query = "
     SELECT 
@@ -20,7 +20,7 @@ $query = "
     JOIN users u ON ci.checkinero_id = u.id
     JOIN clients c ON ci.client_id = c.id
     LEFT JOIN funds f ON ci.fund_id = f.id
-    WHERE ci.status IN ('Procesado', 'Discrepancia') AND ci.digitador_status IS NULL
+    WHERE ci.status IN ('Procesado', 'Faltante') AND ci.digitador_status IS NULL
     ORDER BY ci.created_at DESC
 ";
 

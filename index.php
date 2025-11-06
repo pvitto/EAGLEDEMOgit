@@ -260,7 +260,7 @@ SELECT
         WHEN ci.digitador_status = 'Cerrado' THEN 'Cerrado'
         -- WHEN ci.digitador_status = 'Conforme' THEN 'Conforme' -- Comentado si ya no usas 'Conforme'
         WHEN ci.status = 'Rechazado' THEN 'Rechazado'
-        WHEN ci.status = 'Discrepancia' THEN 'Discrepancia' -- <-- MODIFICADO
+        WHEN ci.status = 'Faltante' THEN 'Faltante' -- <-- MODIFICADO
         WHEN ci.status = 'Procesado' THEN 'Procesado'    -- <-- MODIFICADO
         WHEN ci.status = 'Pendiente' THEN 'Pendiente (Operador)'
         ELSE ci.status
@@ -282,7 +282,7 @@ ORDER BY oc.created_at DESC
 if ($today_collections_result) { while ($row = $today_collections_result->fetch_assoc()) { $today_collections[] = $row; $total_recaudado_hoy += $row['total_counted']; } }
 else { error_log("Error Today collections: " . $conn->error); }
 
-$cierres_pendientes_result = $conn->query("SELECT COUNT(DISTINCT ci.id) as total FROM check_ins ci WHERE ci.status IN ('Procesado', 'Discrepancia') AND ci.digitador_status IS NULL");
+$cierres_pendientes_result = $conn->query("SELECT COUNT(DISTINCT ci.id) as total FROM check_ins ci WHERE ci.status IN ('Procesado', 'Faltante') AND ci.digitador_status IS NULL");
 $cierres_pendientes_count = $cierres_pendientes_result->fetch_assoc()['total'] ?? 0;
 
 // Datos para Selects (Checkinero)
@@ -316,7 +316,7 @@ $checkins_result = $conn->query("
     JOIN routes r ON ci.route_id = r.id
     JOIN users u ON ci.checkinero_id = u.id
     LEFT JOIN funds f ON ci.fund_id = f.id
-    WHERE ci.status IN ('Pendiente', 'Rechazado', 'Procesado', 'Discrepancia')
+    WHERE ci.status IN ('Pendiente', 'Rechazado', 'Procesado', 'Faltante')
     ORDER BY ci.correction_count DESC, ci.created_at DESC
 ");
 if ($checkins_result) { while ($row = $checkins_result->fetch_assoc()) { $initial_checkins[] = $row; } }
@@ -902,7 +902,7 @@ $can_complete = $user_can_act && $task_is_active;
 </div>
 </form></div></div>
                 <?php if ($_SESSION['user_role'] === 'Admin'): ?><div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Planillas Pendientes de Detallar (Admin)</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"></thead><tbody id="operator-checkins-table-body"></tbody></table></div></div><?php endif; ?>
-                <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial de Conteos Realizados</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Cliente</th><th class="p-3">Valor Declarado</th><th class="p-3">Valor Contado</th><th class="p-3">Discrep.</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Operador</th><?php endif; ?><th class="p-3">Fecha</th><th class="p-3">Obs.</th><?php if ($_SESSION['user_role'] === 'Admin'): ?><th class="p-3">Acciones</th><?php endif; ?></tr></thead><tbody id="operator-history-table-body"></tbody></table></div></div>
+                <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial de Conteos Realizados</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Cliente</th><th class="p-3">Valor Declarado</th><th class="p-3">Valor Contado</th><th class="p-3">Faltante.</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Operador</th><?php endif; ?><th class="p-3">Fecha</th><th class="p-3">Obs.</th><?php if ($_SESSION['user_role'] === 'Admin'): ?><th class="p-3">Acciones</th><?php endif; ?></tr></thead><tbody id="operator-history-table-body"></tbody></table></div></div>
             </div>
 
             <?php if (in_array($_SESSION['user_role'], ['Digitador', 'Admin'])): ?>
@@ -1036,7 +1036,7 @@ $can_complete = $user_can_act && $task_is_active;
                         <th class="p-3">Cliente</th>
                         <th class="p-3">Valor Declarado</th>
                         <th class="p-3">Valor Contado</th>
-                        <th class="p-3">Discrep.</th>
+                        <th class="p-3">Faltante.</th>
                         <th class="p-3">Operador</th>
                         <th class="p-3">Fecha Conteo</th>
                         <th class="p-3">Obs. Operador</th>
@@ -1107,8 +1107,8 @@ function canSeeDiscrepancyToasts() {
   const role = (window.currentUserRole || '').toLowerCase();
   return role === 'admin' || role === 'digitador' || role === 'digitadora';
 }
-// ===== Discrepancias: control anti-spam / multi-pestaña (PÉGALO AQUÍ) =====
-// ===== Discrepancias: control anti-spam / multi-pestaña =====
+// ===== Faltantes: control anti-spam / multi-pestaña (PÉGALO AQUÍ) =====
+// ===== Faltantes: control anti-spam / multi-pestaña =====
 const DISCREP_LS_KEY = 'seen_discrepancy_ids_v1';
 const DISCREP_TTL_MS = 5 * 60 * 1000; // “olvida” IDs después de 5 minutos
 
@@ -1416,8 +1416,8 @@ function populateCheckinsTable(rows) {
   const tbody = document.getElementById('checkins-table-body');
   if (!tbody) return;
 
-  // Mostramos Pendiente, Rechazado, Procesado y Discrepancia
-  const visibleStatuses = new Set(['Pendiente','Rechazado','Procesado','Discrepancia']);
+  // Mostramos Pendiente, Rechazado, Procesado y Faltante
+  const visibleStatuses = new Set(['Pendiente','Rechazado','Procesado','Faltante']);
   const rows = (currentCheckinData || []).filter(ci => visibleStatuses.has(ci.status));
 
   if (rows.length === 0) {
@@ -2096,7 +2096,7 @@ async function handleCheckinSubmit(event) {
             return;
         }
 
-        const head = [['Planilla', 'V. Contado', 'Discrepancia', 'Operador', 'Desglose de Billetes/Monedas']];
+        const head = [['Planilla', 'V. Contado', 'Faltante', 'Operador', 'Desglose de Billetes/Monedas']];
         const body = [];
         let totalContado = 0;
         let totalDiscrepancia = 0;
@@ -2307,8 +2307,8 @@ async function handleCheckinSubmit(event) {
             case 'Procesado':
                 statusBadge = `<span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">Procesado</span>`;
                 break;
-            case 'Discrepancia':
-                statusBadge = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-1 rounded-full">Discrepancia</span>`;
+            case 'Faltante':
+                statusBadge = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-1 rounded-full">Faltante</span>`;
                 break;
             default: // Pendiente
                 statusBadge = `<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-full">Pendiente</span>`;
@@ -2539,7 +2539,7 @@ function populateDigitadorOperatorHistoryTable(historyData) {
         if (checkbox.checked) {
             const data = JSON.parse(checkbox.dataset.info);
             const discrepancyClass = data.discrepancy != 0 ? 'text-red-600 font-bold' : 'text-green-600';
-            panel.innerHTML = `<div class="flex justify-between items-start"><h3 class="text-xl font-semibold mb-4 text-blue-800">Planilla en Revisión: ${data.invoice_number}</h3><button onclick="closeReviewPanel()" class="text-gray-500 hover:text-red-600 font-bold text-2xl">&times;</button></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm border-t pt-4 mt-2"><p><strong>Cliente:</strong><br>${data.client_name}</p><p><strong>Operador:</strong><br>${data.operator_name}</p><p><strong>V. Declarado:</strong><br>${formatCurrency(data.declared_value)}</p><p><strong>V. Contado:</strong><br>${formatCurrency(data.total_counted)}</p><p><strong class="${discrepancyClass}">Discrepancia:</strong><br><span class="${discrepancyClass}">${formatCurrency(data.discrepancy)}</span></p><p class="col-span-2 lg:col-span-3"><strong>Obs. del Operador:</strong><br>${data.observations || 'Sin observaciones'}</p></div><div class="mt-6 border-t pt-4"><h4 class="text-md font-semibold mb-2">Decisión de Cierre</h4><div><label for="digitador-observations" class="block text-sm font-medium text-gray-700">Observaciones Finales (Requerido)</label><textarea id="digitador-observations" rows="3" class="mt-1 w-full border rounded-md p-2 shadow-sm" placeholder="Escriba aquí el motivo de la aprobación o rechazo..."></textarea></div><div class="mt-4 flex space-x-4"><button onclick="submitDigitadorReview(${data.check_in_id}, 'Rechazado')" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">Rechazar Conteo</button><button onclick="submitDigitadorReview(${data.check_in_id}, 'Conforme')" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Aprobar (Conforme)</button></div></div>`;
+            panel.innerHTML = `<div class="flex justify-between items-start"><h3 class="text-xl font-semibold mb-4 text-blue-800">Planilla en Revisión: ${data.invoice_number}</h3><button onclick="closeReviewPanel()" class="text-gray-500 hover:text-red-600 font-bold text-2xl">&times;</button></div><div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm border-t pt-4 mt-2"><p><strong>Cliente:</strong><br>${data.client_name}</p><p><strong>Operador:</strong><br>${data.operator_name}</p><p><strong>V. Declarado:</strong><br>${formatCurrency(data.declared_value)}</p><p><strong>V. Contado:</strong><br>${formatCurrency(data.total_counted)}</p><p><strong class="${discrepancyClass}">Faltante:</strong><br><span class="${discrepancyClass}">${formatCurrency(data.discrepancy)}</span></p><p class="col-span-2 lg:col-span-3"><strong>Obs. del Operador:</strong><br>${data.observations || 'Sin observaciones'}</p></div><div class="mt-6 border-t pt-4"><h4 class="text-md font-semibold mb-2">Decisión de Cierre</h4><div><label for="digitador-observations" class="block text-sm font-medium text-gray-700">Observaciones Finales (Requerido)</label><textarea id="digitador-observations" rows="3" class="mt-1 w-full border rounded-md p-2 shadow-sm" placeholder="Escriba aquí el motivo de la aprobación o rechazo..."></textarea></div><div class="mt-4 flex space-x-4"><button onclick="submitDigitadorReview(${data.check_in_id}, 'Rechazado')" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">Rechazar Conteo</button><button onclick="submitDigitadorReview(${data.check_in_id}, 'Conforme')" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">Aprobar (Conforme)</button></div></div>`;
             panel.classList.remove('hidden');
             panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else { panel.classList.add('hidden'); }
@@ -2764,7 +2764,7 @@ function closeToast(toastId) {
                 switch(ci.status) {
                     case 'Rechazado': statusBadge = `<span class="bg-orange-100 text-orange-800 text-xs font-medium px-2.5 py-1 rounded-full">Rechazado</span>`; break;
                     case 'Procesado': statusBadge = `<span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full">Procesado</span>`; break;
-                    case 'Discrepancia': statusBadge = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-1 rounded-full">Discrepancia</span>`; break;
+                    case 'Faltante': statusBadge = `<span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2.5 py-1 rounded-full">Faltante</span>`; break;
                     default: statusBadge = `<span class="bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-full">Pendiente</span>`; break;
                 }
                 const adminDeleteButton = currentUserRole === 'Admin' ? `<td class="p-2"><button onclick="deleteCheckIn(${ci.id})" class="text-red-500 hover:text-red-700 font-semibold text-xs">Eliminar</button></td>` : '';

@@ -47,7 +47,7 @@ $sql = "
     INNER JOIN check_ins ci ON a.check_in_id = ci.id
     WHERE
       t.status = 'Pendiente' AND -- Solo pendientes
-      ci.status = 'Discrepancia' AND -- Garantiza que la alerta sea por discrepancia
+      ci.status = 'Faltante' AND -- Garantiza que la alerta sea por discrepancia
       (t.priority IN ('Critica', 'Alta') OR a.priority IN ('Critica', 'Alta')) AND -- Solo prioritarias
       UNIX_TIMESTAMP(COALESCE(a.created_at, t.created_at)) > ? -- Creadas después de la última revisión
       {$user_filter} -- Filtro de usuario/grupo

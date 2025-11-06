@@ -17,18 +17,59 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['Admin', 
  * Esta función intenta ser lo menos intrusiva posible preservando los valores existentes,
  * el tamaño del tipo de dato y el valor por defecto configurado en la base de datos.
  */
-function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
+function fetchCheckInStatusColumn(mysqli $conn): ?array
 {
     $columnResult = $conn->query("SHOW COLUMNS FROM check_ins LIKE 'status'");
     if (!$columnResult) {
         error_log('No se pudo inspeccionar la columna check_ins.status: ' . $conn->error);
-        return;
+        return null;
     }
 
     $column = $columnResult->fetch_assoc();
     if (!$column) {
         error_log('No se encontró la definición de la columna check_ins.status.');
-        return;
+        return null;
+    }
+
+    return $column;
+}
+
+function checkInStatusAllowsValue(array $column, string $value): bool
+{
+    $type = strtolower($column['Type'] ?? '');
+    if (substr($type, 0, 5) === 'enum(') {
+        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
+            return false;
+        }
+        $values = $matches[1] ?? [];
+        return in_array($value, $values, true);
+    }
+
+    if (substr($type, 0, 4) === 'set(') {
+        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
+            return false;
+        }
+        $values = $matches[1] ?? [];
+        return in_array($value, $values, true);
+    }
+
+    if (preg_match('/^(?:var)?char\\((\\d+)\)/', $type, $lengthMatch)) {
+        $currentLength = (int)($lengthMatch[1] ?? 0);
+        return $currentLength >= strlen('Discrepancia');
+    }
+
+    return true; // Tipos más grandes (TEXT, etc.) deberían soportarlo
+}
+
+function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): bool
+{
+    $column = fetchCheckInStatusColumn($conn);
+    if (!$column) {
+        return false;
+    }
+
+    if (checkInStatusAllowsValue($column, 'Discrepancia')) {
+        return true;
     }
 
     $type = strtolower($column['Type'] ?? '');
@@ -40,12 +81,12 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
 
     if (substr($type, 0, 5) === 'enum(') {
         if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return;
+            return false;
         }
 
         $values = $matches[1] ?? [];
         if (in_array('Discrepancia', $values, true)) {
-            return; // Ya permite el valor requerido
+            return true; // Ya permite el valor requerido
         }
 
         $values[] = 'Discrepancia';
@@ -58,18 +99,19 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         $sql = "ALTER TABLE check_ins MODIFY status ENUM($enumSql)$nullClause$defaultClause";
         if (!$conn->query($sql)) {
             error_log('No se pudo actualizar la columna check_ins.status para incluir Discrepancia: ' . $conn->error);
+            return false;
         }
-        return;
+        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
     }
 
     if (substr($type, 0, 4) === 'set(') {
         if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return;
+            return false;
         }
 
         $values = $matches[1] ?? [];
         if (in_array('Discrepancia', $values, true)) {
-            return; // Ya permite el valor requerido
+            return true; // Ya permite el valor requerido
         }
 
         $values[] = 'Discrepancia';
@@ -82,22 +124,24 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         $sql = "ALTER TABLE check_ins MODIFY status SET($setSql)$nullClause$defaultClause";
         if (!$conn->query($sql)) {
             error_log('No se pudo actualizar la columna check_ins.status de tipo SET: ' . $conn->error);
+            return false;
         }
-        return;
+        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
     }
 
     if (preg_match('/^varchar\((\d+)\)/', $type, $lengthMatch)) {
         $currentLength = (int)($lengthMatch[1] ?? 0);
         $requiredLength = max(12, $currentLength);
         if ($currentLength >= $requiredLength) {
-            return; // Ya tiene espacio suficiente
+            return true; // Ya tiene espacio suficiente
         }
 
         $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
         if (!$conn->query($sql)) {
             error_log('No se pudo ampliar la columna check_ins.status: ' . $conn->error);
+            return false;
         }
-        return;
+        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
     }
 
     if (preg_match('/^char\((\d+)\)/', $type, $lengthMatch)) {
@@ -106,15 +150,19 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
         if (!$conn->query($sql)) {
             error_log('No se pudo convertir la columna check_ins.status de CHAR a VARCHAR: ' . $conn->error);
+            return false;
         }
-        return;
+        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
     }
 
     // Fallback genérico: convertir la columna a VARCHAR si no se reconoce el tipo
     $sql = "ALTER TABLE check_ins MODIFY status VARCHAR(32)$nullClause$defaultClause";
     if (!$conn->query($sql)) {
         error_log('No se pudo actualizar la columna check_ins.status para permitir Discrepancia. Tipo original: ' . $column['Type'] . ' Error: ' . $conn->error);
+        return false;
     }
+
+    return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -150,7 +198,14 @@ if ($method === 'POST') {
 
     // Ajuste preventivo: garantizar que la columna status soporte el valor "Discrepancia"
     if (isset($data['discrepancy']) && floatval($data['discrepancy']) != 0.0) {
-        ensureCheckInStatusSupportsDiscrepancy($conn);
+        if (!ensureCheckInStatusSupportsDiscrepancy($conn)) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => 'El estado "Discrepancia" no está disponible en la tabla check_ins y no se pudo agregar automáticamente. Solicite al administrador de la base de datos que autorice ALTER TABLE o agregue manualmente el valor.'
+            ]);
+            exit;
+        }
     }
 
     $conn->begin_transaction();

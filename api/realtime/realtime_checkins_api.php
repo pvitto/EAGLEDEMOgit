@@ -26,7 +26,7 @@ $checkins_result = $conn->query("
     JOIN routes r ON ci.route_id = r.id
     JOIN users u ON ci.checkinero_id = u.id
     LEFT JOIN funds f ON ci.fund_id = f.id
-    WHERE ci.status IN ('Pendiente', 'Rechazado', 'Procesado', 'Discrepancia') -- O los estados que necesites actualizar dinámicamente
+    WHERE ci.status IN ('Pendiente', 'Rechazado', 'Procesado', 'Faltante') -- O los estados que necesites actualizar dinámicamente
     -- Podrías añadir un filtro de tiempo si solo quieres los más recientes
     -- AND ci.created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
     ORDER BY ci.created_at DESC -- O el orden que prefieras

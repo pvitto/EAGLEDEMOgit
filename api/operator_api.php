@@ -10,172 +10,6 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['Admin', 
     exit;
 }
 
-/**
- * Garantiza que la columna `status` de la tabla `check_ins` pueda almacenar el valor "Discrepancia".
- * Si la columna es un ENUM sin dicho valor, lo agrega. Si es un VARCHAR demasiado corto, lo amplía.
- *
- * Esta función intenta ser lo menos intrusiva posible preservando los valores existentes,
- * el tamaño del tipo de dato y el valor por defecto configurado en la base de datos.
- */
-function fetchCheckInStatusColumn(mysqli $conn): ?array
-{
-    $columnResult = $conn->query("SHOW COLUMNS FROM check_ins LIKE 'status'");
-    if (!$columnResult) {
-        error_log('No se pudo inspeccionar la columna check_ins.status: ' . $conn->error);
-        return null;
-    }
-
-    $column = $columnResult->fetch_assoc();
-    if (!$column) {
-        error_log('No se encontró la definición de la columna check_ins.status.');
-        return null;
-    }
-
-    return $column;
-}
-
-function checkInStatusAllowsValue(array $column, string $value): bool
-{
-    $type = strtolower($column['Type'] ?? '');
-    if ($type === '' ) {
-        return false;
-    }
-
-    if (preg_match('/^(?:tiny|small|medium|big)?int/', $type) ||
-        preg_match('/^(?:decimal|double|float)/', $type) ||
-        preg_match('/^(?:bit|bool|boolean)/', $type)
-    ) {
-        return false; // Tipos numéricos nunca podrán almacenar la cadena "Discrepancia"
-    }
-
-    if (substr($type, 0, 5) === 'enum(') {
-        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return false;
-        }
-        $values = $matches[1] ?? [];
-        return in_array($value, $values, true);
-    }
-
-    if (substr($type, 0, 4) === 'set(') {
-        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return false;
-        }
-        $values = $matches[1] ?? [];
-        return in_array($value, $values, true);
-    }
-
-    if (preg_match('/^(?:var)?char\\((\\d+)\)/', $type, $lengthMatch)) {
-        $currentLength = (int)($lengthMatch[1] ?? 0);
-        return $currentLength >= strlen('Discrepancia');
-    }
-
-    return true; // Tipos más grandes (TEXT, etc.) deberían soportarlo
-}
-
-function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): bool
-{
-    $column = fetchCheckInStatusColumn($conn);
-    if (!$column) {
-        return false;
-    }
-
-    if (checkInStatusAllowsValue($column, 'Discrepancia')) {
-        return true;
-    }
-
-    $type = strtolower($column['Type'] ?? '');
-    $nullClause = ($column['Null'] ?? '') === 'YES' ? ' NULL' : ' NOT NULL';
-    $defaultValue = $column['Default'];
-    $defaultClause = $defaultValue !== null
-        ? " DEFAULT '" . $conn->real_escape_string($defaultValue) . "'"
-        : '';
-
-    if (substr($type, 0, 5) === 'enum(') {
-        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return false;
-        }
-
-        $values = $matches[1] ?? [];
-        if (in_array('Discrepancia', $values, true)) {
-            return true; // Ya permite el valor requerido
-        }
-
-        $values[] = 'Discrepancia';
-        $escapedValues = array_map(
-            fn(string $value): string => "'" . $conn->real_escape_string(stripslashes($value)) . "'",
-            $values
-        );
-
-        $enumSql = implode(',', $escapedValues);
-        $sql = "ALTER TABLE check_ins MODIFY status ENUM($enumSql)$nullClause$defaultClause";
-        if (!$conn->query($sql)) {
-            error_log('No se pudo actualizar la columna check_ins.status para incluir Discrepancia: ' . $conn->error);
-            return false;
-        }
-        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
-    }
-
-    if (substr($type, 0, 4) === 'set(') {
-        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
-            return false;
-        }
-
-        $values = $matches[1] ?? [];
-        if (in_array('Discrepancia', $values, true)) {
-            return true; // Ya permite el valor requerido
-        }
-
-        $values[] = 'Discrepancia';
-        $escapedValues = array_map(
-            fn(string $value): string => "'" . $conn->real_escape_string(stripslashes($value)) . "'",
-            $values
-        );
-
-        $setSql = implode(',', $escapedValues);
-        $sql = "ALTER TABLE check_ins MODIFY status SET($setSql)$nullClause$defaultClause";
-        if (!$conn->query($sql)) {
-            error_log('No se pudo actualizar la columna check_ins.status de tipo SET: ' . $conn->error);
-            return false;
-        }
-        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
-    }
-
-    if (preg_match('/^varchar\((\d+)\)/', $type, $lengthMatch)) {
-        $currentLength = (int)($lengthMatch[1] ?? 0);
-        $requiredLength = max(12, $currentLength);
-        if ($currentLength >= $requiredLength) {
-            return true; // Ya tiene espacio suficiente
-        }
-
-        $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
-        if (!$conn->query($sql)) {
-            error_log('No se pudo ampliar la columna check_ins.status: ' . $conn->error);
-            return false;
-        }
-        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
-    }
-
-    if (preg_match('/^char\((\d+)\)/', $type, $lengthMatch)) {
-        $currentLength = (int)($lengthMatch[1] ?? 0);
-        $requiredLength = max(12, $currentLength);
-        $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
-        if (!$conn->query($sql)) {
-            error_log('No se pudo convertir la columna check_ins.status de CHAR a VARCHAR: ' . $conn->error);
-            return false;
-        }
-        return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
-    }
-
-    // Fallback genérico: convertir la columna a VARCHAR si no se reconoce el tipo
-    $sql = "ALTER TABLE check_ins MODIFY status VARCHAR(32)$nullClause$defaultClause";
-    if (!$conn->query($sql)) {
-        error_log('No se pudo actualizar la columna check_ins.status para permitir Discrepancia. Tipo original: ' . $column['Type'] . ' Error: ' . $conn->error);
-        return false;
-    }
-
-    return checkInStatusAllowsValue(fetchCheckInStatusColumn($conn) ?? $column, 'Discrepancia');
-}
-
 $method = $_SERVER['REQUEST_METHOD'];
 $user_id = $_SESSION['user_id'];
 
@@ -207,81 +41,85 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
 
-    // Ajuste preventivo: garantizar que la columna status soporte el valor "Discrepancia"
-    if (isset($data['discrepancy']) && floatval($data['discrepancy']) != 0.0) {
-        if (!ensureCheckInStatusSupportsDiscrepancy($conn)) {
-            http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'error' => 'El estado "Discrepancia" no está disponible en la tabla check_ins y no se pudo agregar automáticamente. Solicite al administrador de la base de datos que autorice ALTER TABLE o agregue manualmente el valor.'
-            ]);
-            exit;
-        }
-    }
-
     $conn->begin_transaction();
     try {
-        $stmt_insert = $conn->prepare(
-            "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt_insert->bind_param("iiiiiiidddis", 
-            $data['check_in_id'], $user_id, $data['bills_100k'], $data['bills_50k'], $data['bills_20k'],
-            $data['bills_10k'], $data['bills_5k'], $data['bills_2k'], $data['coins'], $data['total_counted'],
-            $data['discrepancy'], $data['observations']
-        );
-        $stmt_insert->execute();
-        $stmt_insert->close();
+        // Step 1: Insert into operator_counts
+        try {
+            $stmt_insert = $conn->prepare(
+                "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt_insert->bind_param("iiiiiiidddis",
+                $data['check_in_id'], $user_id, $data['bills_100k'], $data['bills_50k'], $data['bills_20k'],
+                $data['bills_10k'], $data['bills_5k'], $data['bills_2k'], $data['coins'], $data['total_counted'],
+                $data['discrepancy'], $data['observations']
+            );
+            $stmt_insert->execute();
+            $stmt_insert->close();
+        } catch (Exception $e) {
+            throw new Exception("Error at Step 1 (Inserting operator_counts): " . $e->getMessage());
+        }
 
-        // Lógica estándar: marca como Procesado o Discrepancia. No auto-aprueba.
-        $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Faltante';
-        $stmt_update = $conn->prepare("UPDATE check_ins SET status = ? WHERE id = ?");
-        $stmt_update->bind_param("si", $new_status, $data['check_in_id']);
-        $stmt_update->execute();
-        $stmt_update->close();
+        // Step 2: Update check_ins status
+        try {
+            $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Faltante';
+            $stmt_update = $conn->prepare("UPDATE check_ins SET status = ? WHERE id = ?");
+            $stmt_update->bind_param("si", $new_status, $data['check_in_id']);
+            $stmt_update->execute();
+            $stmt_update->close();
+        } catch (Exception $e) {
+            throw new Exception("Error at Step 2 (Updating check_ins status): " . $e->getMessage());
+        }
 
-        // Generar alerta solo si hay discrepancia
+        // Step 3: Handle discrepancy alert and tasks
         if ($data['discrepancy'] != 0) {
             $check_in_id = $data['check_in_id'];
             $res = $conn->query("SELECT invoice_number FROM check_ins WHERE id = $check_in_id");
             $invoice_number = $res->fetch_assoc()['invoice_number'];
             $discrepancy_formatted = number_format($data['discrepancy'], 0, ',', '.');
-
-            $alert_title = "Discrepancia en Planilla: " . $invoice_number;
+            $alert_title = "Faltante en Planilla: " . $invoice_number;
             $alert_desc = "Diferencia de $" . $discrepancy_formatted . ". Requiere revisión y seguimiento.";
-            
-            $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 'Critica', 'Pendiente', 'Digitador', ?)");
-            $stmt_alert->bind_param("ssi", $alert_title, $alert_desc, $check_in_id);
-        // --- NUEVO CÓDIGO MEJORADO ---
-            $stmt_alert->execute();
-            $alert_id = $stmt_alert->insert_id;
-            $stmt_alert->close();
 
-            // Asignar UNA tarea al GRUPO 'Digitador'
-            if ($alert_id) {
-                $instruction = "Realizar seguimiento a la discrepancia (" . $invoice_number . "), contactar a los responsables y documentar la resolución.";
-
-                // Preparamos la inserción de la tarea asignada al grupo
-                $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'Pendiente', 'Critica', ?)");
-
-                // El created_by_user_id es el Operador que generó la discrepancia
-                $operator_user_id = $_SESSION['user_id'];
-
-                $stmt_task->bind_param("isi", $alert_id, $instruction, $operator_user_id);
-                $stmt_task->execute();
-                $stmt_task->close();
-
-                // Actualizamos el estado de la alerta
-                $conn->query("UPDATE alerts SET status = 'Asignada' WHERE id = $alert_id");
+            // Step 3a: Insert into alerts
+            try {
+                // Priority: 1 -> Alta (Critica), Status: 'P' -> Pendiente
+                $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 1, 'P', 'Digitador', ?)");
+                $stmt_alert->bind_param("ssi", $alert_title, $alert_desc, $check_in_id);
+                $stmt_alert->execute();
+                $alert_id = $stmt_alert->insert_id;
+                $stmt_alert->close();
+            } catch (Exception $e) {
+                throw new Exception("Error at Step 3a (Inserting alert): " . $e->getMessage());
             }
-// --- FIN DEL NUEVO CÓDIGO ---
+
+            if ($alert_id) {
+                // Step 3b: Insert into tasks
+                try {
+                    $instruction = "Seguimiento a planilla " . $invoice_number;
+                    // Status: 'P' -> Pendiente, Priority: 1 -> Alta (Critica)
+                    $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'P', 1, ?)");
+                    $operator_user_id = $_SESSION['user_id'];
+                    $stmt_task->bind_param("isi", $alert_id, $instruction, $operator_user_id);
+                    $stmt_task->execute();
+                    $stmt_task->close();
+                } catch (Exception $e) {
+                    throw new Exception("Error at Step 3b (Inserting task): " . $e->getMessage());
+                }
+
+                // Step 3c: Update alerts status
+                try {
+                    // Status: 'A' -> Asignada
+                    $conn->query("UPDATE alerts SET status = 'A' WHERE id = $alert_id");
+                } catch (Exception $e) {
+                    throw new Exception("Error at Step 3c (Updating alert status): " . $e->getMessage());
+                }
+            }
         }
 
-        // --- Confirmar transacción en la BD ANTES de enviar correos ---
         $conn->commit();
         echo json_encode(['success' => true, 'message' => 'Conteo guardado. Notificando...']);
 
-        // --- Enviar correos DESPUÉS de confirmar la transacción ---
+        // Email logic remains the same...
         try {
             $check_in_id_for_email = $data['check_in_id'];
             $query_details = "
@@ -312,11 +150,11 @@ if ($method === 'POST') {
 
                 if (!empty($recipients)) {
                     if ($data['discrepancy'] != 0) {
-                        $email_subject = "Discrepancia en Planilla: " . $details['invoice_number'];
+                        $email_subject = "Faltante en Planilla: " . $details['invoice_number'];
                     } else {
                         $email_subject = "Nuevo Conteo de Operador: Planilla " . $details['invoice_number'];
                     }
-                    $email_body = "<h1>Reporte de Conteo de Operador</h1><p>El operador <strong>" . htmlspecialchars($details['operator_name']) . "</strong> ha guardado un nuevo conteo.</p><hr><h2>Detalles de la Planilla</h2><ul><li><strong>Número de Planilla:</strong> " . htmlspecialchars($details['invoice_number']) . "</li><li><strong>Cliente:</strong> " . htmlspecialchars($details['client_name']) . "</li></ul><h2>Desglose del Conteo</h2><table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse; width: 300px;'><tr><td><strong>Denominación</strong></td><td style='text-align: right;'><strong>Cantidad</strong></td></tr><tr><td>$100.000</td><td style='text-align: right;'>" . number_format($data['bills_100k']) . "</td></tr><tr><td>$50.000</td><td style='text-align: right;'>" . number_format($data['bills_50k']) . "</td></tr><tr><td>$20.000</td><td style='text-align: right;'>" . number_format($data['bills_20k']) . "</td></tr><tr><td>$10.000</td><td style='text-align: right;'>" . number_format($data['bills_10k']) . "</td></tr><tr><td>$5.000</td><td style='text-align: right;'>" . number_format($data['bills_5k']) . "</td></tr><tr><td>$2.000</td><td style='text-align: right;'>" . number_format($data['bills_2k']) . "</td></tr><tr><td>Monedas</td><td style='text-align: right;'>$ " . number_format($data['coins']) . "</td></tr></table><h2>Totales</h2><ul><li><strong>Total Contado:</strong> $" . number_format($data['total_counted']) . "</li><li><strong>Discrepancia:</strong> <strong style='color: " . ($data['discrepancy'] != 0 ? 'red' : 'green') . ";'>$" . number_format($data['discrepancy']) . "</strong></li></ul><p><strong>Observaciones del Operador:</strong> " . (!empty($data['observations']) ? htmlspecialchars($data['observations']) : 'N/A') . "</p><br><p><em>Este es un correo automático del sistema EAGLE 3.0.</em></p>";
+                    $email_body = "<h1>Reporte de Conteo de Operador</h1><p>El operador <strong>" . htmlspecialchars($details['operator_name']) . "</strong> ha guardado un nuevo conteo.</p><hr><h2>Detalles de la Planilla</h2><ul><li><strong>Número de Planilla:</strong> " . htmlspecialchars($details['invoice_number']) . "</li><li><strong>Cliente:</strong> " . htmlspecialchars($details['client_name']) . "</li></ul><h2>Desglose del Conteo</h2><table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse; width: 300px;'><tr><td><strong>Denominación</strong></td><td style='text-align: right;'><strong>Cantidad</strong></td></tr><tr><td>$100.000</td><td style='text-align: right;'>" . number_format($data['bills_100k']) . "</td></tr><tr><td>$50.000</td><td style='text-align: right;'>" . number_format($data['bills_50k']) . "</td></tr><tr><td>$20.000</td><td style='text-align: right;'>" . number_format($data['bills_20k']) . "</td></tr><tr><td>$10.000</td><td style='text-align: right;'>" . number_format($data['bills_10k']) . "</td></tr><tr><td>$5.000</td><td style='text-align: right;'>" . number_format($data['bills_5k']) . "</td></tr><tr><td>$2.000</td><td style='text-align: right;'>" . number_format($data['bills_2k']) . "</td></tr><tr><td>Monedas</td><td style='text-align: right;'>$ " . number_format($data['coins']) . "</td></tr></table><h2>Totales</h2><ul><li><strong>Total Contado:</strong> $" . number_format($data['total_counted']) . "</li><li><strong>Faltante:</strong> <strong style='color: " . ($data['discrepancy'] != 0 ? 'red' : 'green') . ";'>$" . number_format($data['discrepancy']) . "</strong></li></ul><p><strong>Observaciones del Operador:</strong> " . (!empty($data['observations']) ? htmlspecialchars($data['observations']) : 'N/A') . "</p><br><p><em>Este es un correo automático del sistema EAGLE 3.0.</em></p>";
 
                     foreach ($recipients as $recipient) {
                         send_task_email($recipient['email'], $recipient['name'], $email_subject, $email_body);
@@ -324,15 +162,13 @@ if ($method === 'POST') {
                 }
             }
         } catch (Exception $e) {
-            // Log del error de correo sin afectar al cliente
-            error_log("Error al enviar correo de notificación de conteo: " . $e->getMessage());
+            error_log("Error sending email notification: " . $e->getMessage());
         }
 
     } catch (Exception $e) {
         $conn->rollback();
-        // Solo enviar error si falla la transacción de la BD
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Error en la base de datos: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
     }
 }
 

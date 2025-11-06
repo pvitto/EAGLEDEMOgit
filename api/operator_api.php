@@ -43,67 +43,83 @@ if ($method === 'POST') {
 
     $conn->begin_transaction();
     try {
-        $stmt_insert = $conn->prepare(
-            "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        );
-        $stmt_insert->bind_param("iiiiiiidddis", 
-            $data['check_in_id'], $user_id, $data['bills_100k'], $data['bills_50k'], $data['bills_20k'],
-            $data['bills_10k'], $data['bills_5k'], $data['bills_2k'], $data['coins'], $data['total_counted'],
-            $data['discrepancy'], $data['observations']
-        );
-        $stmt_insert->execute();
-        $stmt_insert->close();
+        // Step 1: Insert into operator_counts
+        try {
+            $stmt_insert = $conn->prepare(
+                "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            );
+            $stmt_insert->bind_param("iiiiiiidddis",
+                $data['check_in_id'], $user_id, $data['bills_100k'], $data['bills_50k'], $data['bills_20k'],
+                $data['bills_10k'], $data['bills_5k'], $data['bills_2k'], $data['coins'], $data['total_counted'],
+                $data['discrepancy'], $data['observations']
+            );
+            $stmt_insert->execute();
+            $stmt_insert->close();
+        } catch (Exception $e) {
+            throw new Exception("Error at Step 1 (Inserting operator_counts): " . $e->getMessage());
+        }
 
-        // Lógica estándar: marca como Procesado o Discrepancia. No auto-aprueba.
-        $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Faltante';
-        $stmt_update = $conn->prepare("UPDATE check_ins SET status = ? WHERE id = ?");
-        $stmt_update->bind_param("si", $new_status, $data['check_in_id']);
-        $stmt_update->execute();
-        $stmt_update->close();
+        // Step 2: Update check_ins status
+        try {
+            $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Faltante';
+            $stmt_update = $conn->prepare("UPDATE check_ins SET status = ? WHERE id = ?");
+            $stmt_update->bind_param("si", $new_status, $data['check_in_id']);
+            $stmt_update->execute();
+            $stmt_update->close();
+        } catch (Exception $e) {
+            throw new Exception("Error at Step 2 (Updating check_ins status): " . $e->getMessage());
+        }
 
-        // Generar alerta solo si hay discrepancia
+        // Step 3: Handle discrepancy alert and tasks
         if ($data['discrepancy'] != 0) {
             $check_in_id = $data['check_in_id'];
             $res = $conn->query("SELECT invoice_number FROM check_ins WHERE id = $check_in_id");
             $invoice_number = $res->fetch_assoc()['invoice_number'];
             $discrepancy_formatted = number_format($data['discrepancy'], 0, ',', '.');
-
             $alert_title = "Faltante en Planilla: " . $invoice_number;
             $alert_desc = "Diferencia de $" . $discrepancy_formatted . ". Requiere revisión y seguimiento.";
-            
-            $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 'Critica', 'Pendiente', 'Digitador', ?)");
-            $stmt_alert->bind_param("ssi", $alert_title, $alert_desc, $check_in_id);
-        // --- NUEVO CÓDIGO MEJORADO ---
-            $stmt_alert->execute();
-            $alert_id = $stmt_alert->insert_id;
-            $stmt_alert->close();
 
-            // Asignar UNA tarea al GRUPO 'Digitador'
-            if ($alert_id) {
-                $instruction = "Realizar seguimiento a la discrepancia (" . $invoice_number . "), contactar a los responsables y documentar la resolución.";
-
-                // Preparamos la inserción de la tarea asignada al grupo
-                $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'Pendiente', 'Critica', ?)");
-
-                // El created_by_user_id es el Operador que generó la discrepancia
-                $operator_user_id = $_SESSION['user_id'];
-
-                $stmt_task->bind_param("isi", $alert_id, $instruction, $operator_user_id);
-                $stmt_task->execute();
-                $stmt_task->close();
-
-                // Actualizamos el estado de la alerta
-                $conn->query("UPDATE alerts SET status = 'Asignada' WHERE id = $alert_id");
+            // Step 3a: Insert into alerts
+            try {
+                // Priority: 'A' -> Alta (Critica), Status: 'P' -> Pendiente
+                $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 'A', 'P', 'Digitador', ?)");
+                $stmt_alert->bind_param("ssi", $alert_title, $alert_desc, $check_in_id);
+                $stmt_alert->execute();
+                $alert_id = $stmt_alert->insert_id;
+                $stmt_alert->close();
+            } catch (Exception $e) {
+                throw new Exception("Error at Step 3a (Inserting alert): " . $e->getMessage());
             }
-// --- FIN DEL NUEVO CÓDIGO ---
+
+            if ($alert_id) {
+                // Step 3b: Insert into tasks
+                try {
+                    $instruction = "Seguimiento a planilla " . $invoice_number;
+                    // Status: 'P' -> Pendiente, Priority: 'A' -> Alta (Critica)
+                    $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'P', 'A', ?)");
+                    $operator_user_id = $_SESSION['user_id'];
+                    $stmt_task->bind_param("isi", $alert_id, $instruction, $operator_user_id);
+                    $stmt_task->execute();
+                    $stmt_task->close();
+                } catch (Exception $e) {
+                    throw new Exception("Error at Step 3b (Inserting task): " . $e->getMessage());
+                }
+
+                // Step 3c: Update alerts status
+                try {
+                    // Status: 'A' -> Asignada
+                    $conn->query("UPDATE alerts SET status = 'A' WHERE id = $alert_id");
+                } catch (Exception $e) {
+                    throw new Exception("Error at Step 3c (Updating alert status): " . $e->getMessage());
+                }
+            }
         }
 
-        // --- Confirmar transacción en la BD ANTES de enviar correos ---
         $conn->commit();
         echo json_encode(['success' => true, 'message' => 'Conteo guardado. Notificando...']);
 
-        // --- Enviar correos DESPUÉS de confirmar la transacción ---
+        // Email logic remains the same...
         try {
             $check_in_id_for_email = $data['check_in_id'];
             $query_details = "
@@ -146,15 +162,13 @@ if ($method === 'POST') {
                 }
             }
         } catch (Exception $e) {
-            // Log del error de correo sin afectar al cliente
-            error_log("Error al enviar correo de notificación de conteo: " . $e->getMessage());
+            error_log("Error sending email notification: " . $e->getMessage());
         }
 
     } catch (Exception $e) {
         $conn->rollback();
-        // Solo enviar error si falla la transacción de la BD
         http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Error en la base de datos: ' . $e->getMessage()]);
+        echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
     }
 }
 

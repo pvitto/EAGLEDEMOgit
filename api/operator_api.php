@@ -56,7 +56,7 @@ if ($method === 'POST') {
         $stmt_insert->close();
 
         // Lógica estándar: marca como Procesado o Discrepancia. No auto-aprueba.
-        $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Discrepancia';
+        $new_status = ($data['discrepancy'] == 0) ? 'Procesado' : 'Faltante';
         $stmt_update = $conn->prepare("UPDATE check_ins SET status = ? WHERE id = ?");
         $stmt_update->bind_param("si", $new_status, $data['check_in_id']);
         $stmt_update->execute();

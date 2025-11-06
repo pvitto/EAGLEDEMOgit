@@ -10,6 +10,72 @@ if (!isset($_SESSION['user_id']) || !in_array($_SESSION['user_role'], ['Admin', 
     exit;
 }
 
+/**
+ * Garantiza que la columna `status` de la tabla `check_ins` pueda almacenar el valor "Discrepancia".
+ * Si la columna es un ENUM sin dicho valor, lo agrega. Si es un VARCHAR demasiado corto, lo amplía.
+ *
+ * Esta función intenta ser lo menos intrusiva posible preservando los valores existentes,
+ * el tamaño del tipo de dato y el valor por defecto configurado en la base de datos.
+ */
+function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
+{
+    $columnResult = $conn->query("SHOW COLUMNS FROM check_ins LIKE 'status'");
+    if (!$columnResult) {
+        error_log('No se pudo inspeccionar la columna check_ins.status: ' . $conn->error);
+        return;
+    }
+
+    $column = $columnResult->fetch_assoc();
+    if (!$column) {
+        error_log('No se encontró la definición de la columna check_ins.status.');
+        return;
+    }
+
+    $type = strtolower($column['Type'] ?? '');
+    $nullClause = ($column['Null'] ?? '') === 'YES' ? ' NULL' : ' NOT NULL';
+    $defaultValue = $column['Default'];
+    $defaultClause = $defaultValue !== null
+        ? " DEFAULT '" . $conn->real_escape_string($defaultValue) . "'"
+        : '';
+
+    if (substr($type, 0, 5) === 'enum(') {
+        if (!preg_match_all("/'((?:[^'\\]|\\.)*)'/", $column['Type'], $matches)) {
+            return;
+        }
+
+        $values = $matches[1] ?? [];
+        if (in_array('Discrepancia', $values, true)) {
+            return; // Ya permite el valor requerido
+        }
+
+        $values[] = 'Discrepancia';
+        $escapedValues = array_map(
+            fn(string $value): string => "'" . $conn->real_escape_string(stripslashes($value)) . "'",
+            $values
+        );
+
+        $enumSql = implode(',', $escapedValues);
+        $sql = "ALTER TABLE check_ins MODIFY status ENUM($enumSql)$nullClause$defaultClause";
+        if (!$conn->query($sql)) {
+            error_log('No se pudo actualizar la columna check_ins.status para incluir Discrepancia: ' . $conn->error);
+        }
+        return;
+    }
+
+    if (preg_match('/^varchar\\((\\d+)\\)/', $type, $lengthMatch)) {
+        $currentLength = (int)($lengthMatch[1] ?? 0);
+        $requiredLength = max(12, $currentLength);
+        if ($currentLength >= $requiredLength) {
+            return; // Ya tiene espacio suficiente
+        }
+
+        $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
+        if (!$conn->query($sql)) {
+            error_log('No se pudo ampliar la columna check_ins.status: ' . $conn->error);
+        }
+    }
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 $user_id = $_SESSION['user_id'];
 
@@ -40,6 +106,11 @@ if ($method === 'GET') {
 
 if ($method === 'POST') {
     $data = json_decode(file_get_contents('php://input'), true);
+
+    // Ajuste preventivo: garantizar que la columna status soporte el valor "Discrepancia"
+    if (isset($data['discrepancy']) && floatval($data['discrepancy']) != 0.0) {
+        ensureCheckInStatusSupportsDiscrepancy($conn);
+    }
 
     $conn->begin_transaction();
     try {

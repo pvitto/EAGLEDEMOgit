@@ -82,13 +82,13 @@ if ($method === 'POST') {
             // Asignar UNA tarea a un usuario 'Digitador'
             if ($alert_id) {
                 // Primero, buscar un usuario 'Digitador' a quien asignar la tarea
-                $res_digitador = $conn->query("SELECT id FROM users WHERE role = 'Digitador' AND status = 'Activo' LIMIT 1");
+                $res_digitador = $conn->query("SELECT id FROM users WHERE role = 'Digitador' LIMIT 1");
                 $assignee_id = null;
                 if ($res_digitador->num_rows > 0) {
                     $assignee_id = $res_digitador->fetch_assoc()['id'];
                 } else {
                     // Fallback: si no hay Digitador, buscar un Admin
-                    $res_admin = $conn->query("SELECT id FROM users WHERE role = 'Admin' AND status = 'Activo' LIMIT 1");
+                    $res_admin = $conn->query("SELECT id FROM users WHERE role = 'Admin' LIMIT 1");
                     if ($res_admin->num_rows > 0) {
                         $assignee_id = $res_admin->fetch_assoc()['id'];
                     }

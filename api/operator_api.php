@@ -62,7 +62,7 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         return;
     }
 
-    if (preg_match('/^varchar\\((\\d+)\\)/', $type, $lengthMatch)) {
+    if (preg_match('/^varchar\((\d+)\)/', $type, $lengthMatch)) {
         $currentLength = (int)($lengthMatch[1] ?? 0);
         $requiredLength = max(12, $currentLength);
         if ($currentLength >= $requiredLength) {
@@ -73,6 +73,23 @@ function ensureCheckInStatusSupportsDiscrepancy(mysqli $conn): void
         if (!$conn->query($sql)) {
             error_log('No se pudo ampliar la columna check_ins.status: ' . $conn->error);
         }
+        return;
+    }
+
+    if (preg_match('/^char\((\d+)\)/', $type, $lengthMatch)) {
+        $currentLength = (int)($lengthMatch[1] ?? 0);
+        $requiredLength = max(12, $currentLength);
+        $sql = "ALTER TABLE check_ins MODIFY status VARCHAR($requiredLength)$nullClause$defaultClause";
+        if (!$conn->query($sql)) {
+            error_log('No se pudo convertir la columna check_ins.status de CHAR a VARCHAR: ' . $conn->error);
+        }
+        return;
+    }
+
+    // Fallback genérico: convertir la columna a VARCHAR si no se reconoce el tipo
+    $sql = "ALTER TABLE check_ins MODIFY status VARCHAR(32)$nullClause$defaultClause";
+    if (!$conn->query($sql)) {
+        error_log('No se pudo actualizar la columna check_ins.status para permitir Discrepancia. Tipo original: ' . $column['Type'] . ' Error: ' . $conn->error);
     }
 }
 

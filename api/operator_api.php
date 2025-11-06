@@ -72,7 +72,7 @@ if ($method === 'POST') {
             $alert_title = "Discrepancia en Planilla: " . $invoice_number;
             $alert_desc = "Diferencia de $" . $discrepancy_formatted . ". Requiere revisión y seguimiento.";
 
-            $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 'Alta', 'Pendiente', 'Digitador', ?)");
+            $stmt_alert = $conn->prepare("INSERT INTO alerts (title, description, priority, status, suggested_role, check_in_id) VALUES (?, ?, 'Critica', 'Pendiente', 'Digitador', ?)");
             $stmt_alert->bind_param("ssi", $alert_title, $alert_desc, $check_in_id);
         // --- NUEVO CÓDIGO MEJORADO ---
             $stmt_alert->execute();
@@ -84,7 +84,7 @@ if ($method === 'POST') {
                 $instruction = "Realizar seguimiento a la discrepancia (" . $invoice_number . "), contactar a los responsables y documentar la resolución.";
 
                 // Preparamos la inserción de la tarea asignada al grupo
-                $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'Pendiente', 'Critica', ?)");
+                $stmt_task = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_group, instruction, type, status, priority, created_by_user_id) VALUES (?, 'Digitador', ?, 'Asignacion', 'Pendiente', 'Alta', ?)");
 
                 // El created_by_user_id es el Operador que generó la discrepancia
                 $operator_user_id = $_SESSION['user_id'];

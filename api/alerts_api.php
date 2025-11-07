@@ -162,24 +162,20 @@ if ($method === 'POST') {
         exit(); // Salir del script después de manejar el recordatorio
 
     } elseif ($type === 'Asignacion') {
-        // --- LÓGICA SUPER CORREGIDA ---
-        // Primero, verificamos si el task_id proporcionado existe REALMENTE en la tabla de tareas.
+        // --- LÓGICA DEFINITIVA ---
         $task_exists = false;
         if ($task_id) {
             $check_stmt = $conn->prepare("SELECT id FROM tasks WHERE id = ?");
-            if($check_stmt) {
+            if ($check_stmt) {
                 $check_stmt->bind_param("i", $task_id);
                 $check_stmt->execute();
                 $check_stmt->store_result();
-                if ($check_stmt->num_rows > 0) {
-                    $task_exists = true;
-                }
+                $task_exists = ($check_stmt->num_rows > 0);
                 $check_stmt->close();
             }
         }
 
-        // Si la tarea existe, es una REASIGNACIÓN (UPDATE).
-        if ($task_exists) {
+        if ($task_exists) { // Es una REASIGNACIÓN (UPDATE)
             $is_update = true;
             $stmt_get_task_data = $conn->prepare("SELECT priority, created_at FROM tasks WHERE id = ?");
             $original_created_at = null;

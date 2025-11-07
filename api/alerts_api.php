@@ -162,48 +162,57 @@ if ($method === 'POST') {
         exit(); // Salir del script después de manejar el recordatorio
 
     } elseif ($type === 'Asignacion') {
-        // --- LÓGICA CORREGIDA ---
-        // Si se provee un task_id, SIEMPRE es una actualización (reasignación).
-        // Si no, es una nueva tarea creada a partir de una alerta.
-        if ($task_id) { // Es una REASIGNACIÓN
-            $is_update = true;
+        // --- LÓGICA SUPER CORREGIDA ---
+        // Primero, verificamos si el task_id proporcionado existe REALMENTE en la tabla de tareas.
+        $task_exists = false;
+        if ($task_id) {
+            $check_stmt = $conn->prepare("SELECT id FROM tasks WHERE id = ?");
+            if($check_stmt) {
+                $check_stmt->bind_param("i", $task_id);
+                $check_stmt->execute();
+                $check_stmt->store_result();
+                if ($check_stmt->num_rows > 0) {
+                    $task_exists = true;
+                }
+                $check_stmt->close();
+            }
+        }
 
-            // 1. Obtener datos clave (prioridad y fecha) de la BD para preservarlos.
+        // Si la tarea existe, es una REASIGNACIÓN (UPDATE).
+        if ($task_exists) {
+            $is_update = true;
             $stmt_get_task_data = $conn->prepare("SELECT priority, created_at FROM tasks WHERE id = ?");
-            $original_created_at = null; // Fallback
+            $original_created_at = null;
             if ($stmt_get_task_data) {
                 $stmt_get_task_data->bind_param("i", $task_id);
                 if ($stmt_get_task_data->execute()) {
                     $result_task = $stmt_get_task_data->get_result();
                     if ($task_data = $result_task->fetch_assoc()) {
-                        $priority = $task_data['priority']; // Usar para el correo
-                        $original_created_at = $task_data['created_at']; // Usar para el UPDATE
+                        $priority = $task_data['priority'];
+                        $original_created_at = $task_data['created_at'];
                     }
                 }
                 $stmt_get_task_data->close();
             }
-
-            // 2. Actualizar la tarea, preservando explícitamente la fecha de creación para
-            //    evitar que un posible trigger 'ON UPDATE' la modifique y reinicie el timer.
-            //    Ni la prioridad ni el status se incluyen, por lo que también se preservan.
             $stmt = $conn->prepare("UPDATE tasks SET assigned_to_user_id = ?, instruction = ?, assigned_to_group = NULL, created_at = ? WHERE id = ?");
             if ($stmt) {
                 $stmt->bind_param("issi", $user_id, $instruction, $original_created_at, $task_id);
             }
-        } elseif ($alert_id) { // Crear nueva Tarea desde Alerta (sin task_id)
-            // 1. Obtener la prioridad de la alerta original
+        }
+        // Si la tarea NO existe (incluso si se pasó un task_id inválido) Y tenemos un alert_id,
+        // entonces es una ASIGNACIÓN NUEVA (INSERT).
+        elseif ($alert_id) {
+            $is_update = false; // Aseguramos que es inserción
             $prio_res = $conn->query("SELECT priority FROM alerts WHERE id = " . intval($alert_id));
             $original_priority = $prio_res ? ($prio_res->fetch_assoc()['priority'] ?? 'Media') : 'Media';
-
-            // 2. Decidir la prioridad final: la del formulario si existe, si no, la de la alerta
             $priority = !empty($data['priority']) ? $data['priority'] : $original_priority;
 
-            // 3. Insertar la nueva tarea
             $stmt = $conn->prepare("INSERT INTO tasks (alert_id, assigned_to_user_id, instruction, type, status, priority, created_by_user_id) VALUES (?, ?, ?, 'Asignacion', 'Pendiente', ?, ?)");
             if ($stmt) {
                 $stmt->bind_param("iissi", $alert_id, $user_id, $instruction, $priority, $creator_id);
             }
         }
+        // Si no se cumple ninguna condición, $stmt será null y se manejará el error.
 
     } elseif ($type === 'Manual') {
         if (!$title) {

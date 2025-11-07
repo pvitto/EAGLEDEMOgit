@@ -325,7 +325,7 @@ if ($checkins_result) { while ($row = $checkins_result->fetch_assoc()) { $initia
 $operator_history = [];
 if (in_array($_SESSION['user_role'], ['Operador', 'Admin', 'Digitador'])) { // Digitador también puede verlo
     $operator_id_filter = ($_SESSION['user_role'] === 'Operador') ? "WHERE op.operator_id = " . intval($_SESSION['user_id']) : "";
-    $history_query = " SELECT op.id, op.check_in_id, op.total_counted, op.discrepancy, op.observations, op.created_at as count_date, ci.invoice_number, ci.declared_value, c.name as client_name, u.name as operator_name FROM operator_counts op INNER JOIN ( SELECT check_in_id, MAX(id) as max_id FROM operator_counts GROUP BY check_in_id ) as latest_oc ON op.id = latest_oc.max_id JOIN check_ins ci ON op.check_in_id = ci.id JOIN clients c ON ci.client_id = c.id JOIN users u ON op.operator_id = u.id {$operator_id_filter} ORDER BY op.created_at DESC ";
+    $history_query = " SELECT op.id, op.check_in_id, op.total_counted, op.discrepancy, op.observations, op.created_at as count_date, ci.invoice_number, ci.declared_value, c.name as client_name, u.name as operator_name, op.table_number FROM operator_counts op INNER JOIN ( SELECT check_in_id, MAX(id) as max_id FROM operator_counts GROUP BY check_in_id ) as latest_oc ON op.id = latest_oc.max_id JOIN check_ins ci ON op.check_in_id = ci.id JOIN clients c ON ci.client_id = c.id JOIN users u ON op.operator_id = u.id {$operator_id_filter} ORDER BY op.created_at DESC ";
     $history_result = $conn->query($history_query);
     if ($history_result) { while($row = $history_result->fetch_assoc()) { $operator_history[] = $row; } }
     else { error_log("Error operator history: " . $conn->error); }
@@ -336,7 +336,7 @@ $digitador_closed_history = [];
 if (in_array($current_user_role, ['Digitador', 'Admin'])) {
    $digitador_filter = "WHERE ci.digitador_status IN ('Procesado', 'Discrepancia', 'Cerrado')";
 
-    $closed_history_result = $conn->query(" SELECT ci.id, ci.invoice_number, c.name as client_name, u_check.name as checkinero_name, oc.total_counted, oc.discrepancy, oc.bills_100k, oc.bills_50k, oc.bills_20k, oc.bills_10k, oc.bills_5k, oc.bills_2k, oc.coins, u_op.name as operator_name, ci.closed_by_digitador_at, u_digitador.name as digitador_name, ci.digitador_status, ci.digitador_observations, f.name as fund_name FROM check_ins ci LEFT JOIN clients c ON ci.client_id = c.id LEFT JOIN users u_check ON ci.checkinero_id = u_check.id LEFT JOIN ( SELECT a.* FROM operator_counts a INNER JOIN ( SELECT check_in_id, MAX(id) as max_id FROM operator_counts GROUP BY check_in_id ) b ON a.id = b.max_id ) oc ON ci.id = oc.check_in_id LEFT JOIN users u_op ON oc.operator_id = u_op.id LEFT JOIN users u_digitador ON ci.closed_by_digitador_id = u_digitador.id LEFT JOIN funds f ON ci.fund_id = f.id {$digitador_filter} ORDER BY ci.closed_by_digitador_at DESC, ci.id DESC" );
+    $closed_history_result = $conn->query(" SELECT ci.id, ci.invoice_number, c.name as client_name, u_check.name as checkinero_name, oc.total_counted, oc.discrepancy, oc.bills_100k, oc.bills_50k, oc.bills_20k, oc.bills_10k, oc.bills_5k, oc.bills_2k, oc.coins, u_op.name as operator_name, ci.closed_by_digitador_at, u_digitador.name as digitador_name, ci.digitador_status, ci.digitador_observations, f.name as fund_name, oc.table_number FROM check_ins ci LEFT JOIN clients c ON ci.client_id = c.id LEFT JOIN users u_check ON ci.checkinero_id = u_check.id LEFT JOIN ( SELECT a.* FROM operator_counts a INNER JOIN ( SELECT check_in_id, MAX(id) as max_id FROM operator_counts GROUP BY check_in_id ) b ON a.id = b.max_id ) oc ON ci.id = oc.check_in_id LEFT JOIN users u_op ON oc.operator_id = u_op.id LEFT JOIN users u_digitador ON ci.closed_by_digitador_id = u_digitador.id LEFT JOIN funds f ON ci.fund_id = f.id {$digitador_filter} ORDER BY ci.closed_by_digitador_at DESC, ci.id DESC" );
     if($closed_history_result){ while($row = $closed_history_result->fetch_assoc()){ $digitador_closed_history[] = $row; } }
     else { error_log("Error digitador history: " . $conn->error); }
 }
@@ -892,7 +892,11 @@ $can_complete = $user_can_act && $task_is_active;
                  <h2 class="text-2xl font-bold text-gray-900 mb-6">Módulo de Operador</h2>
                  <div id="consultation-section" class="bg-white p-6 rounded-xl shadow-lg mb-8">
                      <h3 class="text-xl font-semibold mb-4">Buscar Planilla para Detallar</h3>
-                     <form id="consultation-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center"><label class="block text-sm font-medium">Nro Planilla<input type="text" id="consult-invoice" required class="mt-1 w-full p-2 border rounded-md"></label><div class="pt-6"><button type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Consultar</button></div></form>
+                     <form id="consultation-form" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                        <label class="block text-sm font-medium">Nro Planilla<input type="text" id="consult-invoice" required class="mt-1 w-full p-2 border rounded-md"></label>
+                        <label class="block text-sm font-medium">Nro de Mesa<input type="number" id="table_number" class="mt-1 w-full p-2 border rounded-md"></label>
+                        <div class="pt-6 md:col-span-2"><button type="submit" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Consultar</button></div>
+                     </form>
                 </div>
                 <div id="operator-panel" class="hidden"><div class="bg-white p-6 rounded-xl shadow-lg mb-8 relative"><div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 pb-4 border-b"><div><span class="block text-sm text-gray-500">Nro Planilla</span><strong id="display-invoice" class="text-lg"></strong></div><div><span class="block text-sm text-gray-500">Nro Sello</span><strong id="display-seal" class="text-lg"></strong></div><div><span class="block text-sm text-gray-500">Cliente</span><strong id="display-client" class="text-lg"></strong></div><div><span class="block text-sm text-gray-500">Valor Declarado</span><strong id="display-declared" class="text-lg text-blue-600"></strong></div></div><h3 class="text-xl font-semibold mb-4">Detalle de Denominación</h3><form id="denomination-form"><input type="hidden" id="op-checkin-id"><div class="space-y-2"><?php $denominations = [100000, 50000, 20000, 10000, 5000, 2000]; foreach($denominations as $value): ?><div class="grid grid-cols-5 gap-4 items-center denomination-row" data-value="<?php echo $value; ?>"><div class="col-span-2 font-medium text-gray-700"><?php echo '$' . number_format($value, 0, ',', '.'); ?></div><div class="col-span-2 flex items-center"><button type="button" class="px-3 py-1 bg-gray-200 rounded-l-md font-bold text-lg" onclick="updateQty(this, -1)">-</button><input type="number" value="0" min="0" class="w-full text-center border-t border-b p-1 denomination-qty" oninput="calculateTotals()"><button type="button" class="px-3 py-1 bg-gray-200 rounded-r-md font-bold text-lg" onclick="updateQty(this, 1)">+</button></div><div class="text-right font-mono subtotal">$ 0</div></div><?php endforeach; ?><div class="grid grid-cols-5 gap-4 items-center pt-2 border-t"><div class="col-span-2 font-medium text-gray-700">Monedas</div><div class="col-span-2"><input type="number" id="coins-value" value="0" min="0" step="50" class="w-full border p-1" oninput="calculateTotals()" placeholder="Valor total en monedas"></div><div class="text-right font-mono" id="coins-subtotal">$ 0</div></div><div class="grid grid-cols-5 gap-4 items-center pt-4 mt-4 border-t-2"><div class="col-span-2 font-bold text-xl">Total</div><div class="col-span-3 text-right font-mono text-xl" id="total-counted">$ 0</div></div><div class="grid grid-cols-5 gap-4 items-center"><div class="col-span-2 font-bold text-xl">Diferencia</div><div class="col-span-3 text-right font-mono text-xl" id="discrepancy">$ 0</div></div></div><div class="mt-6"><label for="observations" class="block text-sm font-medium">Observación</label><textarea id="observations" rows="3" class="mt-1 w-full border rounded-md p-2"></textarea></div><div class="mt-6 flex justify-end"><button type="submit" class="bg-green-600 text-white font-bold py-3 px-6 rounded-md hover:bg-green-700">Guardar y Cerrar</button></div><div id="loading-overlay" class="loading-overlay hidden">
     <div class="progress-bar-container">
@@ -902,7 +906,7 @@ $can_complete = $user_can_act && $task_is_active;
 </div>
 </form></div></div>
                 <?php if ($_SESSION['user_role'] === 'Admin'): ?><div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Planillas Pendientes de Detallar (Admin)</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"></thead><tbody id="operator-checkins-table-body"></tbody></table></div></div><?php endif; ?>
-                <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial de Conteos Realizados</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Cliente</th><th class="p-3">Valor Declarado</th><th class="p-3">Valor Contado</th><th class="p-3">Faltante.</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Operador</th><?php endif; ?><th class="p-3">Fecha</th><th class="p-3">Obs.</th><?php if ($_SESSION['user_role'] === 'Admin'): ?><th class="p-3">Acciones</th><?php endif; ?></tr></thead><tbody id="operator-history-table-body"></tbody></table></div></div>
+                <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial de Conteos Realizados</h3><div class="overflow-auto max-h-[600px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Cliente</th><th class="p-3">Valor Declarado</th><th class="p-3">Valor Contado</th><th class="p-3">Faltante.</th><th class="p-3">Mesa</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Operador</th><?php endif; ?><th class="p-3">Fecha</th><th class="p-3">Obs.</th><?php if ($_SESSION['user_role'] === 'Admin'): ?><th class="p-3">Acciones</th><?php endif; ?></tr></thead><tbody id="operator-history-table-body"></tbody></table></div></div>
             </div>
 
             <?php if (in_array($_SESSION['user_role'], ['Digitador', 'Admin'])): ?>
@@ -1057,7 +1061,7 @@ $can_complete = $user_can_act && $task_is_active;
 
                  <div id="panel-historial-cierre" class="hidden">
                     <h2 class="text-2xl font-bold text-gray-900 mb-6">Historial de Planillas Revisadas/Cerradas</h2>
-                    <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial</h3><div class="overflow-auto max-h-[700px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Fondo</th><th class="p-3">Cierre</th><th class="p-3">Total Rec.</th><th class="p-3">Discrep.</th><th class="p-3">Estado</th><th class="p-3">Obs.</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Cerrada por</th><?php endif; ?><th class="p-3">Acciones</th></tr></thead><tbody id="digitador-closed-history-body"></tbody></table></div></div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg mt-8"><h3 class="text-xl font-semibold mb-4">Historial</h3><div class="overflow-auto max-h-[700px]"><table class="w-full text-sm text-left"><thead class="bg-gray-50 sticky top-0"><tr><th class="p-3">Planilla</th><th class="p-3">Fondo</th><th class="p-3">Cierre</th><th class="p-3">Total Rec.</th><th class="p-3">Discrep.</th><th class="p-3">Mesa</th><th class="p-3">Estado</th><th class="p-3">Obs.</th><?php if (in_array($_SESSION['user_role'], ['Admin', 'Digitador'])): ?><th class="p-3">Cerrada por</th><?php endif; ?><th class="p-3">Acciones</th></tr></thead><tbody id="digitador-closed-history-body"></tbody></table></div></div>
                 </div>
 
                 <div id="panel-informes" class="hidden">
@@ -1770,6 +1774,7 @@ async function handleCheckinSubmit(event) {
 
         animateProgressBar(async () => {
             const payload = {
+            table_number: document.getElementById('table_number').value,
             check_in_id: document.getElementById('op-checkin-id').value,
             bills_100k: parseInt(document.querySelector('#denomination-form [data-value="100000"] .denomination-qty').value) || 0,
             bills_50k: parseInt(document.querySelector('#denomination-form [data-value="50000"] .denomination-qty').value) || 0,
@@ -2422,6 +2427,7 @@ function populateOperatorCheckinsTable(checkins) {
                                     <td class="p-3 text-right">${formatCurrency(item.declared_value)}</td>
                                     <td class="p-3 text-right">${formatCurrency(item.total_counted)}</td>
                                     <td class="p-3 text-right ${discrepancyClass}">${formatCurrency(item.discrepancy)}</td>
+                                    <td class="p-3">${item.table_number || 'N/A'}</td>
                                     ${operatorColumn}
                                     <td class="p-3 text-xs whitespace-nowrap">${new Date(item.count_date).toLocaleString('es-CO')}</td>
                                     <td class="p-3 text-xs max-w-xs truncate" title="${item.observations || ''}">${item.observations || 'N/A'}</td>
@@ -2521,6 +2527,7 @@ function populateDigitadorOperatorHistoryTable(historyData) {
                     <td class="p-3 text-xs">${item.closed_by_digitador_at ? formatDate(item.closed_by_digitador_at) : 'N/A'}</td>
                     <td class="p-3 text-right font-mono">${formatCurrency(item.total_counted)}</td>
                     <td class="p-3 text-right ${discrepancyClass}">${formatCurrency(item.discrepancy)}</td>
+                    <td class="p-3">${item.table_number || 'N/A'}</td>
                     <td class="p-3">${statusBadge}</td>
                     <td class="p-3 text-xs max-w-xs truncate" title="${item.digitador_observations || ''}">${item.digitador_observations || 'N/A'}</td>
                     ${cerradaPorCol}

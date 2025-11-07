@@ -1,6 +1,6 @@
 <?php
 // Configuración de la conexión a la base de datos para XAMPP
-$servername = "localhost"; // El servidor de la base de datos es 'localhost' (usualmente en el puerto 3306 por defecto)
+$servername = "127.0.0.1"; // El servidor de la base de datos es 'localhost' (usualmente en el puerto 3306 por defecto)
 $username = "imancini9_paoloman";        // Usuario por defecto en XAMPP
 $password = "Pman!cini1";            // Contraseña por defecto en XAMPP es vacía
 $dbname = "imancini9_eagle_3_db";    // El nombre de la base de datos que creamos

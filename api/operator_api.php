@@ -44,13 +44,13 @@ if ($method === 'POST') {
     $conn->begin_transaction();
     try {
         $stmt_insert = $conn->prepare(
-            "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO operator_counts (check_in_id, operator_id, bills_100k, bills_50k, bills_20k, bills_10k, bills_5k, bills_2k, coins, total_counted, discrepancy, observations, table_number)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt_insert->bind_param("iiiiiiidddis",
+        $stmt_insert->bind_param("iiiiiiidddisi",
             $data['check_in_id'], $user_id, $data['bills_100k'], $data['bills_50k'], $data['bills_20k'],
             $data['bills_10k'], $data['bills_5k'], $data['bills_2k'], $data['coins'], $data['total_counted'],
-            $data['discrepancy'], $data['observations']
+            $data['discrepancy'], $data['observations'], $data['table_number']
         );
         $stmt_insert->execute();
         $stmt_insert->close();
@@ -156,7 +156,7 @@ if ($method === 'POST') {
                     } else {
                         $email_subject = "Nuevo Conteo de Operador: Planilla " . $details['invoice_number'];
                     }
-                    $email_body = "<h1>Reporte de Conteo de Operador</h1><p>El operador <strong>" . htmlspecialchars($details['operator_name']) . "</strong> ha guardado un nuevo conteo.</p><hr><h2>Detalles de la Planilla</h2><ul><li><strong>Número de Planilla:</strong> " . htmlspecialchars($details['invoice_number']) . "</li><li><strong>Cliente:</strong> " . htmlspecialchars($details['client_name']) . "</li></ul><h2>Desglose del Conteo</h2><table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse; width: 300px;'><tr><td><strong>Denominación</strong></td><td style='text-align: right;'><strong>Cantidad</strong></td></tr><tr><td>$100.000</td><td style='text-align: right;'>" . number_format($data['bills_100k']) . "</td></tr><tr><td>$50.000</td><td style='text-align: right;'>" . number_format($data['bills_50k']) . "</td></tr><tr><td>$20.000</td><td style='text-align: right;'>" . number_format($data['bills_20k']) . "</td></tr><tr><td>$10.000</td><td style='text-align: right;'>" . number_format($data['bills_10k']) . "</td></tr><tr><td>$5.000</td><td style='text-align: right;'>" . number_format($data['bills_5k']) . "</td></tr><tr><td>$2.000</td><td style='text-align: right;'>" . number_format($data['bills_2k']) . "</td></tr><tr><td>Monedas</td><td style='text-align: right;'>$ " . number_format($data['coins']) . "</td></tr></table><h2>Totales</h2><ul><li><strong>Total Contado:</strong> $" . number_format($data['total_counted']) . "</li><li><strong>Discrepancia:</strong> <strong style='color: " . ($data['discrepancy'] != 0 ? 'red' : 'green') . ";'>$" . number_format($data['discrepancy']) . "</strong></li></ul><p><strong>Observaciones del Operador:</strong> " . (!empty($data['observations']) ? htmlspecialchars($data['observations']) : 'N/A') . "</p><br><p><em>Este es un correo automático del sistema EAGLE 3.0.</em></p>";
+                    $email_body = "<h1>Reporte de Conteo de Operador</h1><p>El operador <strong>" . htmlspecialchars($details['operator_name']) . "</strong> ha guardado un nuevo conteo desde la mesa <strong>" . htmlspecialchars($data['table_number']) . "</strong>.</p><hr><h2>Detalles de la Planilla</h2><ul><li><strong>Número de Planilla:</strong> " . htmlspecialchars($details['invoice_number']) . "</li><li><strong>Cliente:</strong> " . htmlspecialchars($details['client_name']) . "</li></ul><h2>Desglose del Conteo</h2><table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse; width: 300px;'><tr><td><strong>Denominación</strong></td><td style='text-align: right;'><strong>Cantidad</strong></td></tr><tr><td>$100.000</td><td style='text-align: right;'>" . number_format($data['bills_100k']) . "</td></tr><tr><td>$50.000</td><td style='text-align: right;'>" . number_format($data['bills_50k']) . "</td></tr><tr><td>$20.000</td><td style='text-align: right;'>" . number_format($data['bills_20k']) . "</td></tr><tr><td>$10.000</td><td style='text-align: right;'>" . number_format($data['bills_10k']) . "</td></tr><tr><td>$5.000</td><td style='text-align: right;'>" . number_format($data['bills_5k']) . "</td></tr><tr><td>$2.000</td><td style='text-align: right;'>" . number_format($data['bills_2k']) . "</td></tr><tr><td>Monedas</td><td style='text-align: right;'>$ " . number_format($data['coins']) . "</td></tr></table><h2>Totales</h2><ul><li><strong>Total Contado:</strong> $" . number_format($data['total_counted']) . "</li><li><strong>Discrepancia:</strong> <strong style='color: " . ($data['discrepancy'] != 0 ? 'red' : 'green') . ";'>$" . number_format($data['discrepancy']) . "</strong></li></ul><p><strong>Observaciones del Operador:</strong> " . (!empty($data['observations']) ? htmlspecialchars($data['observations']) : 'N/A') . "</p><br><p><em>Este es un correo automático del sistema EAGLE 3.0.</em></p>";
 
                     foreach ($recipients as $recipient) {
                         send_task_email($recipient['email'], $recipient['name'], $email_subject, $email_body);

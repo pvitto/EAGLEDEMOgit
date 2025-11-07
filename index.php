@@ -131,7 +131,7 @@ $manual_tasks_sql = "
     LEFT JOIN users u ON t.assigned_to_user_id = u.id
     WHERE t.alert_id IS NULL AND t.type = 'Manual' AND t.status = 'Pendiente'
       {$task_filter} -- Se aplica el filtro corregido
-    GROUP BY IF(t.assigned_to_group IS NOT NULL, CONCAT(t.title, t.assigned_to_group, t.created_at), t.id)
+    GROUP BY t.id
     ORDER BY FIELD(t.priority, 'Critica', 'Alta', 'Media', 'Baja'), t.created_at DESC
 ";
 $manual_tasks_result = $conn->query($manual_tasks_sql);

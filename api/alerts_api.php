@@ -83,14 +83,14 @@ if ($method === 'POST') {
     $notify_by_email = true; // Siempre enviar correo para asignaciones/recordatorios
 
     // ... (Validaciones y Lógica Grupal omitidas por brevedad, no tienen cambios) ...
+    /*
+     // ESTE BLOQUE ES EL ERROR, LO ELIMINAMOS.
      if ($assign_to_group) {
-        // --- Asignación Grupal (sin cambios) ---
-        // Este bloque es idéntico al anterior
         echo json_encode(['success' => true, 'message' => 'Tareas asignadas al grupo con éxito.']);
         $conn->close();
         exit;
     }
-
+    */
 
     // ===== LÓGICA PARA ASIGNACIÓN INDIVIDUAL Y RECORDATORIOS =====
     $stmt = null;
@@ -221,9 +221,12 @@ if ($method === 'POST') {
             $conn->close();
             exit;
         }
-        $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
+        // --- LÓGICA CORREGIDA PARA GRUPOS ---
+        // Preparamos la query para aceptar tanto asignación individual como grupal.
+        $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, assigned_to_group, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, ?, 'Manual', ?, ?, ?)");
         if ($stmt) {
-            $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $start_datetime, $end_datetime, $creator_id);
+            // Si es asignación a grupo, $user_id es null. Si es individual, $assign_to_group es null.
+            $stmt->bind_param("sssisssi", $title, $instruction, $priority, $user_id, $assign_to_group, $start_datetime, $end_datetime, $creator_id);
         }
     }
 

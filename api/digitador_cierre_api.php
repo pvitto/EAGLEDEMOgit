@@ -27,8 +27,7 @@ if ($method === 'GET' && $action === 'list_funds_to_close') {
         FROM funds f
         JOIN clients c ON f.client_id = c.id
         JOIN check_ins ci ON ci.fund_id = f.id
-        WHERE ci.status IN ('Procesado', 'Faltante')
-          AND (ci.digitador_status IS NULL OR ci.digitador_status <> 'Cerrado')
+        WHERE ci.status IN ('Procesado', 'Faltante') AND ci.digitador_status IS NULL
         ORDER BY f.name ASC
     ";
 
@@ -73,7 +72,7 @@ if ($method === 'GET' && $action === 'list_funds_to_close') {
         ) oc ON ci.id = oc.check_in_id
         WHERE ci.fund_id = ?
           AND ci.status IN ('Procesado','Faltante')  -- Estado del Operador
-          AND (ci.digitador_status IS NULL OR ci.digitador_status <> 'Cerrado') -- Estado del Digitador
+          AND ci.digitador_status IS NULL -- Estado del Digitador
         ORDER BY ci.invoice_number ASC -- Opcional: Ordenar por número de planilla
     ");
 
@@ -122,7 +121,7 @@ if ($method === 'GET' && $action === 'list_funds_to_close') {
             // 1. Obtener los IDs de los check_ins que cumplen las condiciones para cerrar
             $stmt_select_ids = $conn->prepare("
                 SELECT id FROM check_ins
-                WHERE fund_id = ? AND status IN ('Procesado', 'Faltante') AND (digitador_status IS NULL OR digitador_status <> 'Cerrado')
+                WHERE fund_id = ? AND status IN ('Procesado', 'Faltante') AND digitador_status IS NULL
             ");
             if (!$stmt_select_ids) throw new Exception("Error preparando SELECT IDs: " . $conn->error);
 

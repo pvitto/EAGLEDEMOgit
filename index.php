@@ -639,6 +639,7 @@ $conn->close();
                <button id="tab-mi-historial" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('mi-historial')">Mi Historial de Tareas</button>
                <?php if ($_SESSION['user_role'] === 'Admin'): ?>
                    <button id="tab-roles" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('roles')">Gestión de Roles</button>
+                   <button id="tab-historial-estadisticas" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('historial-estadisticas')">Historial y Estadísticas</button>
                    <button id="tab-manage-clients" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('manage-clients')">Gestionar Clientes</button>
                    <button id="tab-manage-routes" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('manage-routes')">Gestionar Rutas</button>
                    <button id="tab-manage-funds" class="nav-tab <?php echo $role_nav_class; ?>" onclick="switchTab('manage-funds')">Gestionar Fondos</button>
@@ -1083,6 +1084,60 @@ $can_complete = $user_can_act && $task_is_active;
             <div id="content-manage-clients" class="hidden"><div class="loader"></div><p class="text-center text-gray-500">Cargando...</p></div>
             <div id="content-manage-routes" class="hidden"><div class="loader"></div><p class="text-center text-gray-500">Cargando...</p></div>
             <div id="content-manage-funds" class="hidden"><div class="loader"></div><p class="text-center text-gray-500">Cargando...</p></div>
+
+            <div id="content-historial-estadisticas" class="hidden">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Historial de Recaudos y Estadísticas</h2>
+                <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                        <div>
+                            <label for="historial-start-date" class="block text-sm font-medium text-gray-700">Fecha Inicio</label>
+                            <input type="date" id="historial-start-date" class="mt-1 w-full p-2 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="historial-end-date" class="block text-sm font-medium text-gray-700">Fecha Fin</label>
+                            <input type="date" id="historial-end-date" class="mt-1 w-full p-2 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="historial-user-filter" class="block text-sm font-medium text-gray-700">Filtrar por Usuario</label>
+                            <select id="historial-user-filter" class="mt-1 w-full p-2 border rounded-md">
+                                <option value="">Todos los usuarios</option>
+                                <?php foreach($all_users as $user): ?>
+                                    <option value="<?php echo $user['id']; ?>"><?php echo htmlspecialchars($user['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <button id="historial-apply-filter" class="w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700">Aplicar Filtros</button>
+                    </div>
+                </div>
+
+                <!-- Contenedor de Estadísticas -->
+                <div id="historial-stats-container" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- Las tarjetas de estadísticas se insertarán aquí -->
+                </div>
+
+                <!-- Aquí irá la tabla con el historial de recaudos -->
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-900">Historial de Recaudos</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-gray-500 uppercase bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3">Fecha</th>
+                                    <th class="px-6 py-3">Planilla</th>
+                                    <th class="px-6 py-3">Cliente</th>
+                                    <th class="px-6 py-3">Operador</th>
+                                    <th class="px-6 py-3">Digitador</th>
+                                    <th class="px-6 py-3">Monto</th>
+                                    <th class="px-6 py-3">Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historial-recaudos-tbody">
+                                <!-- Los datos se cargarán aquí -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
             <?php endif; ?>
         </main>
     </div>
@@ -1470,6 +1525,83 @@ checkinPollingInterval = setInterval(refreshCheckinsRealtime, 15000);
        if (priority === 'Media') return 'bg-yellow-100 text-yellow-800';
        return 'bg-gray-100 text-gray-800';
     }
+    async function fetchHistorialRecaudos() {
+        const tbody = document.getElementById('historial-recaudos-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-500">Cargando historial...</td></tr>';
+
+        const startDate = document.getElementById('historial-start-date').value;
+        const endDate = document.getElementById('historial-end-date').value;
+        const userId = document.getElementById('historial-user-filter').value;
+
+        let query = new URLSearchParams();
+        if (startDate) query.append('start_date', startDate);
+        if (endDate) query.append('end_date', endDate);
+        if (userId) query.append('user_id', userId);
+
+        try {
+            const response = await fetch(`${apiUrlBase}/historial_api.php?${query.toString()}`);
+            const result = await response.json();
+
+            if (!result.success) throw new Error(result.error || 'Error desconocido');
+
+            // --- Renderizar Estadísticas ---
+            const statsContainer = document.getElementById('historial-stats-container');
+            if (statsContainer && result.stats) {
+                const stats = result.stats;
+                let statsHTML = `
+                    <div class="bg-blue-50 p-4 rounded-lg shadow-sm border border-blue-200">
+                        <h4 class="text-sm font-medium text-blue-800">Total Recaudado</h4>
+                        <p class="text-2xl font-bold text-blue-900 mt-1">${formatCurrency(stats.total_recaudado)}</p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded-lg shadow-sm border border-green-200">
+                        <h4 class="text-sm font-medium text-green-800">Total de Planillas</h4>
+                        <p class="text-2xl font-bold text-green-900 mt-1">${stats.total_planillas}</p>
+                    </div>
+                `;
+
+                // Añadir más tarjetas de estadísticas si es necesario
+                if (Object.keys(stats.recaudo_por_operador).length > 0) {
+                    statsHTML += `<div class="bg-yellow-50 p-4 rounded-lg shadow-sm border border-yellow-200">
+                                    <h4 class="text-sm font-medium text-yellow-800">Recaudo por Operador</h4>
+                                    <ul class="text-xs mt-2 space-y-1">`;
+                    for (const [name, data] of Object.entries(stats.recaudo_por_operador)) {
+                        statsHTML += `<li class="flex justify-between"><span>${name}:</span> <strong>${formatCurrency(data.total)}</strong> (${data.count} planillas)</li>`;
+                    }
+                    statsHTML += `</ul></div>`;
+                }
+
+                statsContainer.innerHTML = statsHTML;
+            }
+
+
+            tbody.innerHTML = '';
+            if (result.data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-500">No se encontraron registros con los filtros seleccionados.</td></tr>';
+                return;
+            }
+
+            result.data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b';
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">${formatDate(row.created_at)}</td>
+                    <td class="px-6 py-4 font-mono">${row.invoice_number}</td>
+                    <td class="px-6 py-4">${row.client_name}</td>
+                    <td class="px-6 py-4">${row.operator_name}</td>
+                    <td class="px-6 py-4">${row.digitador_name || 'N/A'}</td>
+                    <td class="px-6 py-4 text-right">${formatCurrency(row.total_counted)}</td>
+                    <td class="px-6 py-4">${row.final_status}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+        } catch (error) {
+            console.error('Error fetching historial:', error);
+            tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-500">Error al cargar el historial: ${error.message}</td></tr>`;
+        }
+    }
+
     function getRoleDisplayNameJS(role, gender) {
        if (gender === 'F') {
            switch (role) {
@@ -3071,7 +3203,7 @@ async function pollAlerts() {
     async function switchTab(tabName) {
         sessionStorage.setItem('activeTab', tabName);
 
-        const staticContentPanels = ['operaciones', 'checkinero', 'operador', 'digitador', 'mi-historial', 'roles', 'trazabilidad'];
+        const staticContentPanels = ['operaciones', 'checkinero', 'operador', 'digitador', 'mi-historial', 'roles', 'trazabilidad', 'historial-estadisticas'];
         const dynamicContentPanels = ['manage-clients', 'manage-routes', 'manage-funds'];
         const allContentPanels = staticContentPanels.concat(dynamicContentPanels);
 
@@ -3145,6 +3277,10 @@ async function pollAlerts() {
             }
             // ***** FIN DEL BLOQUE NUEVO *****
         // ***** FIN CÓDIGO PEGADO *****
+            if(tabName === 'historial-estadisticas') {
+                document.getElementById('historial-apply-filter')?.addEventListener('click', fetchHistorialRecaudos);
+                fetchHistorialRecaudos(); // Cargar datos iniciales sin filtros
+            }
 
             if (dynamicContentPanels.includes(tabName) && !loadedContent[tabName]) {
                 activeContent.innerHTML = '<div class="loader"></div><p class="text-center text-gray-500">Cargando...</p>';

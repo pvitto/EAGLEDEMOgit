@@ -226,7 +226,7 @@ if ($method === 'POST') {
         $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, assigned_to_group, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, ?, 'Manual', ?, ?, ?)");
         if ($stmt) {
             // Si es asignación a grupo, $user_id es null. Si es individual, $assign_to_group es null.
-            $stmt->bind_param("sssiss_si", $title, $instruction, $priority, $user_id, $assign_to_group, $start_datetime, $end_datetime, $creator_id);
+            $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $assign_to_group, $start_datetime, $end_datetime, $creator_id);
         }
     }
 

@@ -1041,7 +1041,6 @@ $can_complete = $user_can_act && $task_is_active;
                         <th class="p-3">Valor Declarado</th>
                         <th class="p-3">Valor Contado</th>
                         <th class="p-3">Faltante.</th>
-                        <th class="p-3">Mesa</th>
                         <th class="p-3">Operador</th>
                         <th class="p-3">Fecha Conteo</th>
                         <th class="p-3">Obs. Operador</th>
@@ -2443,7 +2442,7 @@ function populateDigitadorOperatorHistoryTable(historyData) {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const colspan = 9;
+    const colspan = 8; // 8 columnas
 
     if (!historyData || historyData.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colspan}" class="p-4 text-center text-gray-500">No hay conteos registrados por el operador.</td></tr>`;
@@ -2461,7 +2460,6 @@ function populateDigitadorOperatorHistoryTable(historyData) {
                                 <td class="p-3 text-right">${formatCurrency(item.declared_value)}</td>
                                 <td class="p-3 text-right">${formatCurrency(item.total_counted)}</td>
                                 <td class="p-3 text-right ${discrepancyClass}">${formatCurrency(item.discrepancy)}</td>
-                                <td class="p-3">${item.table_number || 'N/A'}</td>
                                 ${operatorColumn}
                                 <td class="p-3 text-xs whitespace-nowrap">${new Date(item.count_date).toLocaleString('es-CO')}</td>
                                 <td class="p-3 text-xs max-w-xs truncate" title="${item.observations || ''}">${item.observations || 'N/A'}</td>

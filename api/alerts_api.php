@@ -83,13 +83,6 @@ if ($method === 'POST') {
     $notify_by_email = true; // Siempre enviar correo para asignaciones/recordatorios
 
     // ... (Validaciones y Lógica Grupal omitidas por brevedad, no tienen cambios) ...
-     if ($assign_to_group) {
-        // --- Asignación Grupal (sin cambios) ---
-        // Este bloque es idéntico al anterior
-        echo json_encode(['success' => true, 'message' => 'Tareas asignadas al grupo con éxito.']);
-        $conn->close();
-        exit;
-    }
 
 
     // ===== LÓGICA PARA ASIGNACIÓN INDIVIDUAL Y RECORDATORIOS =====
@@ -212,9 +205,20 @@ if ($method === 'POST') {
             $conn->close();
             exit;
         }
-        $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
-        if ($stmt) {
-            $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $start_datetime, $end_datetime, $creator_id);
+
+        // --- LÓGICA MEJORADA PARA ASIGNACIÓN MANUAL (INDIVIDUAL O GRUPAL) ---
+        if ($assign_to_group) {
+            // Asignación a un grupo
+            $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_group, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
+            if ($stmt) {
+                $stmt->bind_param("ssssssi", $title, $instruction, $priority, $assign_to_group, $start_datetime, $end_datetime, $creator_id);
+            }
+        } else {
+            // Asignación a un usuario individual
+            $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
+            if ($stmt) {
+                $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $start_datetime, $end_datetime, $creator_id);
+            }
         }
     }
 

@@ -83,13 +83,6 @@ if ($method === 'POST') {
     $notify_by_email = true; // Siempre enviar correo para asignaciones/recordatorios
 
     // ... (Validaciones y Lógica Grupal omitidas por brevedad, no tienen cambios) ...
-     if ($assign_to_group) {
-        // --- Asignación Grupal (sin cambios) ---
-        // Este bloque es idéntico al anterior
-        echo json_encode(['success' => true, 'message' => 'Tareas asignadas al grupo con éxito.']);
-        $conn->close();
-        exit;
-    }
 
 
     // ===== LÓGICA PARA ASIGNACIÓN INDIVIDUAL Y RECORDATORIOS =====
@@ -212,9 +205,20 @@ if ($method === 'POST') {
             $conn->close();
             exit;
         }
-        $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
-        if ($stmt) {
-            $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $start_datetime, $end_datetime, $creator_id);
+
+        // --- LÓGICA MEJORADA PARA ASIGNACIÓN MANUAL (INDIVIDUAL O GRUPAL) ---
+        if ($assign_to_group) {
+            // Asignación a un grupo
+            $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_group, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
+            if ($stmt) {
+                $stmt->bind_param("ssssssi", $title, $instruction, $priority, $assign_to_group, $start_datetime, $end_datetime, $creator_id);
+            }
+        } else {
+            // Asignación a un usuario individual
+            $stmt = $conn->prepare("INSERT INTO tasks (title, instruction, priority, assigned_to_user_id, type, start_datetime, end_datetime, created_by_user_id) VALUES (?, ?, ?, ?, 'Manual', ?, ?, ?)");
+            if ($stmt) {
+                $stmt->bind_param("sssissi", $title, $instruction, $priority, $user_id, $start_datetime, $end_datetime, $creator_id);
+            }
         }
     }
 
@@ -225,62 +229,75 @@ if ($method === 'POST') {
                  $conn->query("UPDATE alerts SET status = 'Asignada' WHERE id = " . intval($alert_id));
             }
 
-            // --- LÓGICA MEJORADA PARA NOTIFICACIÓN POR CORREO ---
-            if ($user_id && $type !== 'Recordatorio') {
+            // --- LÓGICA DE NOTIFICACIÓN POR CORREO UNIFICADA ---
+            $recipients = [];
+
+            if ($assign_to_group) {
+                $stmt_group = $conn->prepare("SELECT name, email FROM users WHERE role = ?");
+                if ($stmt_group) {
+                    $stmt_group->bind_param("s", $assign_to_group);
+                    if ($stmt_group->execute()) {
+                        $result_group = $stmt_group->get_result();
+                        while ($user_row = $result_group->fetch_assoc()) {
+                            if (!empty($user_row['email'])) {
+                                $recipients[] = $user_row;
+                            }
+                        }
+                    }
+                    $stmt_group->close();
+                }
+            } elseif ($user_id && $type !== 'Recordatorio') {
                 $stmt_user = $conn->prepare("SELECT name, email FROM users WHERE id = ?");
                 if ($stmt_user) {
                     $stmt_user->bind_param("i", $user_id);
-                    $stmt_user->execute();
-                    $result_user = $stmt_user->get_result();
-
-                    if ($user_data = $result_user->fetch_assoc()) {
-                        if (!empty($user_data['email'])) {
-
-                            $email_title = $title; // Título para Tareas Manuales
-
-                            // Si es Asignación (nueva o reasignación), buscar el título correcto
-                            if ($type === 'Asignacion') {
-                                $source_id = $task_id ?: $alert_id; // ID de la tarea o alerta
-                                $is_task = (bool)$task_id;
-
-                                // Query unificada para buscar el título
-                                $title_query = $is_task
-                                    ? "SELECT COALESCE(a.title, t.title) as title FROM tasks t LEFT JOIN alerts a ON t.alert_id = a.id WHERE t.id = ?"
-                                    : "SELECT title FROM alerts WHERE id = ?";
-
-                                $stmt_title = $conn->prepare($title_query);
-                                if($stmt_title){
-                                    $stmt_title->bind_param("i", $source_id);
-                                    if($stmt_title->execute()){
-                                        $res_title = $stmt_title->get_result();
-                                        if($title_data = $res_title->fetch_assoc()){
-                                            $email_title = $title_data['title'];
-                                        }
-                                    }
-                                    $stmt_title->close();
-                                }
-                            }
-
-                            $email_title = $email_title ?: 'Nueva Tarea Asignada'; // Fallback
-
-                            $subject = "[EAGLE 3.0] Tarea Asignada: " . htmlspecialchars($email_title);
-                            $body = "
-                                <h1>Hola " . htmlspecialchars($user_data['name']) . ",</h1>
-                                <p>El usuario <strong>" . htmlspecialchars($creator_name) . "</strong> te ha asignado una tarea en el sistema EAGLE 3.0.</p>
-                                <hr>
-                                <p><strong>Tarea:</strong> " . htmlspecialchars($email_title) . "</p>
-                                <p><strong>Instrucción:</strong> " . htmlspecialchars($instruction) . "</p>
-                                <p><strong>Prioridad:</strong> " . htmlspecialchars($priority) . "</p>
-                                <p>Por favor, ingresa a la plataforma para ver los detalles completos.</p>
-                                <br>
-                                <p><em>Este es un correo automático, por favor no respondas a este mensaje.</em></p>
-                            ";
-                            if ($notify_by_email) {
-                                send_task_email($user_data['email'], $user_data['name'], $subject, $body);
+                    if ($stmt_user->execute()) {
+                        $result_user = $stmt_user->get_result();
+                        if ($user_data = $result_user->fetch_assoc()) {
+                            if (!empty($user_data['email'])) {
+                                $recipients[] = $user_data;
                             }
                         }
                     }
                     $stmt_user->close();
+                }
+            }
+
+            if (!empty($recipients) && $notify_by_email) {
+                $email_title = $title;
+                if ($type === 'Asignacion') {
+                    $source_id = $task_id ?: $alert_id;
+                    $is_task = (bool)$task_id;
+                    $title_query = $is_task
+                        ? "SELECT COALESCE(a.title, t.title) as title FROM tasks t LEFT JOIN alerts a ON t.alert_id = a.id WHERE t.id = ?"
+                        : "SELECT title FROM alerts WHERE id = ?";
+                    $stmt_title = $conn->prepare($title_query);
+                    if ($stmt_title) {
+                        $stmt_title->bind_param("i", $source_id);
+                        if ($stmt_title->execute()) {
+                            $res_title = $stmt_title->get_result();
+                            if ($title_data = $res_title->fetch_assoc()) {
+                                $email_title = $title_data['title'];
+                            }
+                        }
+                        $stmt_title->close();
+                    }
+                }
+                $email_title = $email_title ?: 'Nueva Tarea Asignada';
+                $subject = "[EAGLE 3.0] Tarea Asignada: " . htmlspecialchars($email_title);
+
+                foreach ($recipients as $recipient) {
+                    $body = "
+                        <h1>Hola " . htmlspecialchars($recipient['name']) . ",</h1>
+                        <p>El usuario <strong>" . htmlspecialchars($creator_name) . "</strong> ha asignado una tarea en el sistema EAGLE 3.0.</p>
+                        <hr>
+                        <p><strong>Tarea:</strong> " . htmlspecialchars($email_title) . "</p>
+                        <p><strong>Instrucción:</strong> " . htmlspecialchars($instruction) . "</p>
+                        <p><strong>Prioridad:</strong> " . htmlspecialchars($priority) . "</p>
+                        <p>Por favor, ingresa a la plataforma para ver los detalles completos.</p>
+                        <br>
+                        <p><em>Este es un correo automático, por favor no respondas a este mensaje.</em></p>
+                    ";
+                    send_task_email($recipient['email'], $recipient['name'], $subject, $body);
                 }
             }
 
